@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Status and check-in rules</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+body{margin:0;font-family:Inter,system-ui,sans-serif;color:#14181f}
+</style>
+</helmet>
+<div style="position:relative;width:1440px;height:820px;background:#f7f8fa;font-family:Inter,system-ui,sans-serif;color:#14181f">
+
+<div style="position:absolute;left:64px;top:392px;width:1312px;height:140px;box-sizing:border-box;background:#eef1f5;border:1px dashed #8b93a1;border-radius:10px"></div>
+
+<svg role="img" aria-label="From Available to Dispatched, when command dispatches a unit" width="159" height="8" viewBox="0 0 159 8" preserveAspectRatio="none" style="position:absolute;left:264px;top:232px;width:159px;height:8px;overflow:visible;fill:none;stroke:#566070;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><defs><marker id="dc-arrow-head-filled-1" orient="auto" markerWidth="5" markerHeight="5" refX="2" refY="2" overflow="visible"><path d="M0 0 L4 2 L0 4 Z" fill="#566070" stroke="none" style="stroke:none;fill:#566070;fill:context-stroke"/></marker></defs><path d="M 0 4 L 155 4" marker-end="url(#dc-arrow-head-filled-1)"></path></svg>
+<svg role="img" aria-label="From Dispatched to On scene, when the unit arrives" width="159" height="8" viewBox="0 0 159 8" preserveAspectRatio="none" style="position:absolute;left:624px;top:232px;width:159px;height:8px;overflow:visible;fill:none;stroke:#566070;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><defs><marker id="dc-arrow-head-filled-2" orient="auto" markerWidth="5" markerHeight="5" refX="2" refY="2" overflow="visible"><path d="M0 0 L4 2 L0 4 Z" fill="#566070" stroke="none" style="stroke:none;fill:#566070;fill:context-stroke"/></marker></defs><path d="M 0 4 L 155 4" marker-end="url(#dc-arrow-head-filled-2)"></path></svg>
+<svg aria-hidden="true" width="8" height="48" viewBox="0 0 8 48" preserveAspectRatio="none" style="position:absolute;left:880px;top:272px;width:8px;height:48px;overflow:visible;fill:none;stroke:#566070;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="M 4 0 L 4 48"></path></svg>
+<svg aria-hidden="true" width="720" height="8" viewBox="0 0 720 8" preserveAspectRatio="none" style="position:absolute;left:164px;top:316px;width:720px;height:8px;overflow:visible;fill:none;stroke:#566070;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="M 0 4 L 720 4"></path></svg>
+<svg role="img" aria-label="From On scene back to Available, when command clears the unit" width="8" height="47" viewBox="0 0 8 47" preserveAspectRatio="none" style="position:absolute;left:160px;top:273px;width:8px;height:47px;overflow:visible;fill:none;stroke:#566070;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><defs><marker id="dc-arrow-head-filled-3" orient="auto" markerWidth="5" markerHeight="5" refX="2" refY="2" overflow="visible"><path d="M0 0 L4 2 L0 4 Z" fill="#566070" stroke="none" style="stroke:none;fill:#566070;fill:context-stroke"/></marker></defs><path d="M 4 47 L 4 4" marker-end="url(#dc-arrow-head-filled-3)"></path></svg>
+
+<div style="position:absolute;left:64px;top:64px;font-size:28px;font-weight:700;line-height:36px">Status flow and check-in rules</div>
+<div style="position:absolute;left:64px;top:108px;width:900px;font-size:14px;line-height:20px;color:#566070">Dispatcher status and contact state are two separate things. A unit can be Dispatched and No contact at the same time, and the map shows both.</div>
+
+<div style="position:absolute;left:64px;top:164px;font-size:12px;font-weight:700;line-height:16px;letter-spacing:0.06em;color:#566070">INCIDENT FLOW</div>
+
+<div style="position:absolute;left:64px;top:200px;width:200px;height:72px;box-sizing:border-box;padding:8px;display:flex;align-items:center;justify-content:center;text-align:center;background:#1b7f5c;color:#ffffff;border-radius:10px;font-size:13px;line-height:18px"><span><b style="font-size:15px">Available</b><br>Suggested for new incidents</span></div>
+<div style="position:absolute;left:424px;top:200px;width:200px;height:72px;box-sizing:border-box;padding:8px;display:flex;align-items:center;justify-content:center;text-align:center;background:#1d5fd1;color:#ffffff;border-radius:10px;font-size:13px;line-height:18px"><span><b style="font-size:15px">Dispatched</b><br>En route to an incident</span></div>
+<div style="position:absolute;left:784px;top:200px;width:200px;height:72px;box-sizing:border-box;padding:8px;display:flex;align-items:center;justify-content:center;text-align:center;background:#6b3fb5;color:#ffffff;border-radius:10px;font-size:13px;line-height:18px"><span><b style="font-size:15px">On scene</b><br>At the incident location</span></div>
+
+<div style="position:absolute;left:308px;top:208px;width:72px;text-align:center;font-size:13px;line-height:16px;color:#2b323c">Dispatch</div>
+<div style="position:absolute;left:672px;top:208px;width:64px;text-align:center;font-size:13px;line-height:16px;color:#2b323c">Arrived</div>
+<div style="position:absolute;left:444px;top:292px;width:160px;text-align:center;font-size:13px;line-height:16px;color:#2b323c">Cleared by command</div>
+
+<div style="position:absolute;left:1064px;top:200px;width:312px;font-size:13px;line-height:19px;color:#2b323c">Dispatch sets the status and creates the assignment in one step. Command confirms before it takes effect. Clearing is always manual, so a unit never frees itself and gets double-assigned.</div>
+
+<div style="position:absolute;left:80px;top:404px;font-size:12px;font-weight:700;line-height:16px;letter-spacing:0.06em;color:#566070">MANUAL STATES, SET BY COMMAND FROM ANY STATE</div>
+<div style="position:absolute;left:96px;top:436px;width:200px;height:72px;box-sizing:border-box;padding:8px;display:flex;align-items:center;justify-content:center;text-align:center;background:#f0a020;color:#14181f;border-radius:10px;font-size:13px;line-height:18px"><span><b style="font-size:15px">Busy</b><br>Shown dimmed, can be overridden</span></div>
+<div style="position:absolute;left:336px;top:436px;width:200px;height:72px;box-sizing:border-box;padding:8px;display:flex;align-items:center;justify-content:center;text-align:center;background:#3b4350;color:#ffffff;border-radius:10px;font-size:13px;line-height:18px"><span><b style="font-size:15px">Off duty</b><br>Gray on map, never suggested</span></div>
+<div style="position:absolute;left:576px;top:436px;width:760px;font-size:13px;line-height:19px;color:#2b323c">Busy and Off duty are decided by command and do not come from the radio. Setting a unit to either one removes its incident assignment. Moving a unit back to Available is another manual step.</div>
+
+<div style="position:absolute;left:64px;top:556px;font-size:12px;font-weight:700;line-height:16px;letter-spacing:0.06em;color:#566070">CHECK-IN RULES, SEPARATE FROM STATUS</div>
+
+<div style="position:absolute;left:64px;top:596px;font-size:13px;line-height:16px;font-weight:600">Parked units, fallback check-in every 15 min</div>
+<div style="position:absolute;left:64px;top:620px;width:437px;height:48px;box-sizing:border-box;padding:6px 12px;display:flex;align-items:center;background:#d8efe6;color:#0f5a40;border-radius:8px 0 0 8px;font-size:13px;line-height:17px"><span><b>Normal</b> · reported within 15 min</span></div>
+<div style="position:absolute;left:501px;top:620px;width:437px;height:48px;box-sizing:border-box;padding:6px 12px;display:flex;align-items:center;background:#fff1d6;color:#7a4300;border:2px dashed #c76a00;font-size:13px;line-height:17px"><span><b>Late</b> · one missed check-in, 15 to 30 min, amber</span></div>
+<div style="position:absolute;left:938px;top:620px;width:438px;height:48px;box-sizing:border-box;padding:6px 12px;display:flex;align-items:center;background:#e3e6eb;color:#2b323c;border-radius:0 8px 8px 0;font-size:13px;line-height:17px"><span><b>No contact</b> · over 30 min, gray, not suggested</span></div>
+
+<div style="position:absolute;left:64px;top:684px;font-size:13px;line-height:16px;font-weight:600">Units last seen moving, tighter limits</div>
+<div style="position:absolute;left:64px;top:708px;width:175px;height:48px;box-sizing:border-box;padding:6px 12px;display:flex;align-items:center;background:#d8efe6;color:#0f5a40;border-radius:8px 0 0 8px;font-size:13px;line-height:17px"><span><b>Normal</b> · under 2 min</span></div>
+<div style="position:absolute;left:239px;top:708px;width:700px;height:48px;box-sizing:border-box;padding:6px 12px;display:flex;align-items:center;background:#fff1d6;color:#7a4300;border:2px dashed #c76a00;font-size:13px;line-height:17px"><span><b>Late</b> · silent for 2 to 10 min while moving, amber. Most likely lost coverage or a problem.</span></div>
+<div style="position:absolute;left:939px;top:708px;width:437px;height:48px;box-sizing:border-box;padding:6px 12px;display:flex;align-items:center;background:#e3e6eb;color:#2b323c;border-radius:0 8px 8px 0;font-size:13px;line-height:17px"><span><b>No contact</b> · over 10 min, gray, not suggested</span></div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":820}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>
