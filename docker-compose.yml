@@ -1,0 +1,19 @@
+services:
+  crewaware:
+    build: .
+    image: crewaware:latest
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - crewaware-data:/data
+    # Demo mode with the simulator. Remove this line for a real site.
+    command: ["-sim"]
+    # When the MeshCore USB gateway exists, pass the companion node through (Linux hosts only):
+    # devices:
+    #   - /dev/ttyACM0:/dev/ttyACM0
+    # group_add:
+    #   - dialout
+
+volumes:
+  crewaware-data:
