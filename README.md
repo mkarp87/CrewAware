@@ -18,7 +18,7 @@ CrewAware is a Rust app built and deployed the same way as DMR-Master-System: Do
 You need Docker with Compose v2.
 
 ```
-cp .env.example .env     # set POSTGRES_PASSWORD and CREWAWARE_ADMIN_PASSWORD (12+ characters)
+cp .env.example .env     # set POSTGRES_PASSWORD, CREWAWARE_ADMIN_PASSWORD (12+ characters) and CREWAWARE_SECRET_KEY
                          # and set CREWAWARE_SIM=1 to try it with simulated units
 docker compose up -d --build
 ```
@@ -48,13 +48,14 @@ DATABASE_URL=postgres://user:pw@localhost/crewaware CREWAWARE_SIM=1 CREWAWARE_AD
 - Dispatch is all-or-nothing and refuses a unit another seat already took
 - Manual status per unit, on scene, close incident, and an activity log with seat names
 - Repeaters with check-in status, vehicle groups, logo and slogan branding
+- Repeater readings: an admin stores each repeater's login password (encrypted with `CREWAWARE_SECRET_KEY`), CrewAware reads repeaters one at a time on a slow schedule, and everyone sees the latest reading with its age. Admins can press **Read now** (limited to once a minute per repeater). A successful read counts as a repeater check-in. Reading is read-only: there is no way to change a repeater's settings.
 - PostgreSQL stores configuration, incidents, the log and a throttled position history; overlay images are stored there too, so one backup covers everything
 - Admin login (argon2 password hashes, session cookies, login throttling) protects Setup; dispatching needs no login
 - Ages use the monotonic clock, so a wall-clock jump cannot change contact states, and a restart shows no contact until a unit reports again
 
 ## Not done yet
 
-- MeshCore USB gateway (the simulator stands in for it)
+- MeshCore USB gateway (the simulator stands in for it). Until it exists, repeater reads only work in simulator mode, and **Read now** says no gateway is configured. The reading field names (battery, noise floor, SNR, uptime) are provisional until the gateway defines what a repeater returns.
 - Obstacles and routed ETA, site profile export/import and site switching
 - Repeater drag-to-place on the map, polling of silent units, alerts, report exports
 

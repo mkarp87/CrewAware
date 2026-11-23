@@ -12,7 +12,10 @@ async fn fresh() -> Option<Store> {
     sqlx::query("DROP SCHEMA public CASCADE").execute(&wipe).await.unwrap();
     sqlx::query("CREATE SCHEMA public").execute(&wipe).await.unwrap();
     wipe.close().await;
-    let s = Store::connect(&url).await.unwrap();
+    let s = Store::connect(&url)
+        .await
+        .unwrap()
+        .with_secret_key(Some("test passphrase one"));
     s.migrate().await.unwrap();
     Some(s)
 }
@@ -119,6 +122,56 @@ async fn store_round_trip_and_auth() {
     assert!(store.get_asset("nope").await.unwrap().is_none());
     assert_eq!(store.prune_assets(&["overlay-1.png"]).await.unwrap(), 1);
     assert!(store.get_asset("logo-1.png").await.unwrap().is_none());
+
+    // ---- repeater passwords: encrypted at rest, tied to the key ----
+    let plain = "hunter2-repeater-pw";
+    store.set_repeater_password("r1", plain).await.unwrap();
+    assert_eq!(store.get_repeater_password("r1").await.unwrap().as_deref(), Some(plain));
+    assert!(store.get_repeater_password("r2").await.unwrap().is_none());
+    let url = std::env::var("TEST_DATABASE_URL").unwrap();
+    let raw = sqlx::PgPool::connect(&url).await.unwrap();
+    let ct: Vec<u8> = sqlx::query_scalar("SELECT ciphertext FROM repeater_credentials WHERE repeater_id = 'r1'")
+        .fetch_one(&raw)
+        .await
+        .unwrap();
+    assert!(
+        !ct.windows(plain.len()).any(|w| w == plain.as_bytes()),
+        "password must not be stored in the clear"
+    );
+    let wrong = Store::connect(&url)
+        .await
+        .unwrap()
+        .with_secret_key(Some("a different passphrase"));
+    assert!(
+        wrong.get_repeater_password("r1").await.is_err(),
+        "wrong key must fail, not return garbage"
+    );
+    let nokey = Store::connect(&url).await.unwrap();
+    assert!(!nokey.credentials_enabled());
+    assert!(nokey.set_repeater_password("r1", "x").await.is_err());
+    raw.close().await;
+
+    // readings and the credential flag survive a reload
+    e.record_reading(
+        "r1",
+        true,
+        "",
+        serde_json::json!({ "battery_mv": 4010, "noise_floor_dbm": -112 }),
+    )
+    .unwrap();
+    e.record_reading("r2", false, "no response", serde_json::Value::Null)
+        .unwrap();
+    flush(&store, &mut e).await;
+    let loaded = store.load().await.unwrap();
+    let r1 = loaded.repeaters.iter().find(|r| r.id == "r1").unwrap();
+    assert!(r1.has_credentials);
+    let rd = r1.reading.as_ref().unwrap();
+    assert!(rd.ok && rd.data["battery_mv"] == 4010);
+    let r2 = loaded.repeaters.iter().find(|r| r.id == "r2").unwrap();
+    assert!(!r2.has_credentials);
+    assert!(!r2.reading.as_ref().unwrap().ok && r2.reading.as_ref().unwrap().error == "no response");
+    store.delete_repeater_password("r1").await.unwrap();
+    assert!(store.get_repeater_password("r1").await.unwrap().is_none());
 
     // ---- admin accounts ----
     assert!(
