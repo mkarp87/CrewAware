@@ -30,6 +30,14 @@ CGO_ENABLED=0 GOOS=linux   GOARCH=arm64 go build -o crewaware-pi .
 CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o crewaware.exe .
 ```
 
+## Run in a container
+
+```
+docker compose up --build        # demo mode with the simulator, http://localhost:8080
+```
+
+Data lives in the `crewaware-data` volume. Remove `command: ["-sim"]` in `docker-compose.yml` for a real site. USB passthrough for the radio only works on Linux hosts, so on Windows and macOS run the plain binary instead once the gateway exists. The container still uses the JSON-file store. A Postgres option needs a Go driver module, which is not added yet.
+
 ## What works now (milestones M1 to M3, partly)
 
 - Live map over an uploaded overlay image, pinned with two anchors (north-up images only)
