@@ -134,6 +134,18 @@ impl Unit {
     }
 }
 
+/// The result of the last attempt to read a repeater over the mesh. `data` holds whatever the radio
+/// layer returned (battery, noise floor, airtime and so on) so the schema does not have to change
+/// when the protocol layer learns to read more.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct RepeaterReading {
+    pub read_at: DateTime<Utc>,
+    pub ok: bool,
+    /// Why the attempt failed; empty on success.
+    pub error: String,
+    pub data: serde_json::Value,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Repeater {
     pub id: String,
@@ -142,6 +154,10 @@ pub struct Repeater {
     pub lon: f64,
     pub placed: bool,
     pub last_seen: Option<DateTime<Utc>>,
+    /// Whether a login password is stored. The password itself never leaves the store.
+    #[serde(default)]
+    pub has_credentials: bool,
+    pub reading: Option<RepeaterReading>,
     #[serde(skip)]
     pub seen_mono: Option<Instant>,
 }

@@ -1,7 +1,9 @@
 //! PostgreSQL persistence. The engine keeps live state in memory and emits `Change`s; this crate
 //! loads state at startup, applies changes, and stores assets and admin accounts.
 
-use anyhow::{anyhow, Result};
+use aes_gcm::aead::{Aead, AeadCore, KeyInit, OsRng as AeadOsRng};
+use aes_gcm::{Aes256Gcm, Key, Nonce};
+use anyhow::{anyhow, Context, Result};
 use argon2::password_hash::rand_core::OsRng;
 use argon2::password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString};
 use argon2::Argon2;
@@ -22,6 +24,8 @@ const SESSION_HOURS: i64 = 12;
 pub struct Store {
     pool: PgPool,
     last_history: Mutex<HashMap<String, Instant>>,
+    /// Key for repeater passwords, derived from CREWAWARE_SECRET_KEY. None disables storing them.
+    secret: Option<[u8; 32]>,
 }
 
 impl Store {
@@ -34,7 +38,78 @@ impl Store {
         Ok(Store {
             pool,
             last_history: Mutex::new(HashMap::new()),
+            secret: None,
         })
+    }
+
+    /// Sets the passphrase repeater passwords are encrypted with. Anyone with the database and this
+    /// value can read them, which is the accepted trade-off: the app has to log in to repeaters.
+    pub fn with_secret_key(mut self, passphrase: Option<&str>) -> Store {
+        self.secret = passphrase.filter(|p| !p.is_empty()).map(|p| {
+            let mut h = Sha256::new();
+            h.update(b"crewaware/repeater-credentials/v1");
+            h.update(p.as_bytes());
+            h.finalize().into()
+        });
+        self
+    }
+
+    pub fn credentials_enabled(&self) -> bool {
+        self.secret.is_some()
+    }
+
+    fn cipher(&self) -> Result<Aes256Gcm> {
+        let k = self
+            .secret
+            .as_ref()
+            .ok_or_else(|| anyhow!("CREWAWARE_SECRET_KEY is not set, so repeater passwords cannot be stored"))?;
+        Ok(Aes256Gcm::new(Key::<Aes256Gcm>::from_slice(k)))
+    }
+
+    pub async fn set_repeater_password(&self, repeater_id: &str, password: &str) -> Result<()> {
+        let cipher = self.cipher()?;
+        let nonce = Aes256Gcm::generate_nonce(&mut AeadOsRng);
+        let ct = cipher
+            .encrypt(&nonce, password.as_bytes())
+            .map_err(|_| anyhow!("encryption failed"))?;
+        sqlx::query(
+            "INSERT INTO repeater_credentials (repeater_id,nonce,ciphertext) VALUES ($1,$2,$3)
+             ON CONFLICT (repeater_id) DO UPDATE SET nonce=$2, ciphertext=$3, updated_at=now()",
+        )
+        .bind(repeater_id)
+        .bind(nonce.as_slice())
+        .bind(ct)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn get_repeater_password(&self, repeater_id: &str) -> Result<Option<String>> {
+        let Some(row) = sqlx::query("SELECT nonce, ciphertext FROM repeater_credentials WHERE repeater_id = $1")
+            .bind(repeater_id)
+            .fetch_optional(&self.pool)
+            .await?
+        else {
+            return Ok(None);
+        };
+        let nonce: Vec<u8> = row.get("nonce");
+        let ct: Vec<u8> = row.get("ciphertext");
+        if nonce.len() != 12 {
+            return Err(anyhow!("stored nonce is the wrong length"));
+        }
+        let pt = self
+            .cipher()?
+            .decrypt(Nonce::from_slice(&nonce), ct.as_ref())
+            .map_err(|_| anyhow!("could not decrypt the stored password (was CREWAWARE_SECRET_KEY changed?)"))?;
+        Ok(Some(String::from_utf8(pt).context("stored password is not text")?))
+    }
+
+    pub async fn delete_repeater_password(&self, repeater_id: &str) -> Result<()> {
+        sqlx::query("DELETE FROM repeater_credentials WHERE repeater_id = $1")
+            .bind(repeater_id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
     }
 
     pub async fn migrate(&self) -> Result<()> {
@@ -116,10 +191,26 @@ impl Store {
                 seen_mono: None,
             });
         }
-        for r in sqlx::query("SELECT * FROM repeaters ORDER BY name, id")
-            .fetch_all(&self.pool)
-            .await?
-        {
+        let rows = sqlx::query(
+            "SELECT r.*, (c.repeater_id IS NOT NULL) AS has_credentials,
+                    s.read_at, s.ok AS read_ok, s.error AS read_error, s.data AS read_data
+             FROM repeaters r
+             LEFT JOIN repeater_credentials c ON c.repeater_id = r.id
+             LEFT JOIN repeater_status s ON s.repeater_id = r.id
+             ORDER BY r.name, r.id",
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        for r in rows {
+            let read_at: Option<DateTime<Utc>> = r.get("read_at");
+            let reading = read_at.map(|read_at| RepeaterReading {
+                read_at,
+                ok: r.get::<Option<bool>, _>("read_ok").unwrap_or(false),
+                error: r.get::<Option<String>, _>("read_error").unwrap_or_default(),
+                data: r
+                    .get::<Option<serde_json::Value>, _>("read_data")
+                    .unwrap_or(serde_json::Value::Null),
+            });
             st.repeaters.push(Repeater {
                 id: r.get("id"),
                 name: r.get("name"),
@@ -127,6 +218,8 @@ impl Store {
                 lon: r.get("lon"),
                 placed: r.get("placed"),
                 last_seen: r.get("last_seen"),
+                has_credentials: r.get("has_credentials"),
+                reading,
                 seen_mono: None,
             });
         }
@@ -199,6 +292,19 @@ impl Store {
                 .bind(r.lon)
                 .bind(r.placed)
                 .bind(r.last_seen)
+                .execute(&self.pool)
+                .await?;
+            }
+            Change::Reading { repeater_id, reading } => {
+                sqlx::query(
+                    "INSERT INTO repeater_status (repeater_id,read_at,ok,error,data) VALUES ($1,$2,$3,$4,$5)
+                     ON CONFLICT (repeater_id) DO UPDATE SET read_at=$2,ok=$3,error=$4,data=$5",
+                )
+                .bind(repeater_id)
+                .bind(reading.read_at)
+                .bind(reading.ok)
+                .bind(&reading.error)
+                .bind(&reading.data)
                 .execute(&self.pool)
                 .await?;
             }

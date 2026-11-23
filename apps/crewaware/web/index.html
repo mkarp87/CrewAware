@@ -266,6 +266,20 @@ function tabsRender(){
     t.append(h("button",{class:tab===id?"act":"",onclick:()=>{tab=id;render();}},label));
   }
 }
+// Field names are provisional until the radio gateway defines what a repeater returns.
+function readingText(r){
+  if(!r.has_credentials)return "no password stored, so it is not being read";
+  const rd=r.reading;
+  if(!rd)return "not read yet";
+  const ago=fmtAge(Math.max(0,(Date.parse(S.now)-Date.parse(rd.read_at))/1000))+" ago";
+  if(!rd.ok)return "last read failed ("+rd.error+") · "+ago;
+  const d=rd.data||{}, p=[];
+  if(d.battery_mv!=null)p.push((d.battery_mv/1000).toFixed(2)+" V");
+  if(d.noise_floor_dbm!=null)p.push("noise "+d.noise_floor_dbm+" dBm");
+  if(d.last_snr_db!=null)p.push("SNR "+d.last_snr_db+" dB");
+  if(d.uptime_s!=null)p.push("up "+(d.uptime_s>=86400?Math.floor(d.uptime_s/86400)+" d":Math.floor(d.uptime_s/3600)+" h"));
+  return (p.length?p.join(" · ")+" · ":"")+"read "+ago;
+}
 function unitsPanel(){
   const b=h("div");
   for(const u of S.units){
@@ -280,9 +294,12 @@ function unitsPanel(){
   }
   const rp=S.repeaters.length?[h("h3",null,"Repeaters")]:[];
   for(const r of S.repeaters){
+    const col=r.contact==="normal"?"#2e9e5b":r.contact==="late"?"#c9a400":"#e5484d";
     rp.push(h("div",{class:"row"},h("div",{class:"nm"},h("div",null,r.name),
-      h("div",{class:"sub ct-"+r.contact},r.contact==="no_contact"?"no contact":(r.contact==="late"?"late · ":"ok · ")+fmtAge(r.age_sec)+" ago"+(r.placed?"":" · not placed"))),
-      h("span",{class:"chip",style:"background:"+(r.contact==="normal"?"#2e9e5b":r.contact==="late"?"#c9a400":"#e5484d")},r.contact==="normal"?"OK":r.contact==="late"?"Late":"Down")));
+      h("div",{class:"sub ct-"+r.contact},r.contact==="no_contact"?"no contact":(r.contact==="late"?"late · ":"ok · ")+fmtAge(r.age_sec)+" ago"+(r.placed?"":" · not placed")),
+      h("div",{class:"sub"},readingText(r))),
+      adminState.admin&&r.has_credentials?h("button",{title:"Ask this repeater for its status now",onclick:()=>act(()=>api(`/api/repeaters/${encodeURIComponent(r.id)}/refresh`,{}))},"Read now"):null,
+      h("span",{class:"chip",style:"background:"+col},r.contact==="normal"?"OK":r.contact==="late"?"Late":"Down")));
   }
   b.append(...rp);
   return b;
@@ -407,8 +424,21 @@ function setupPanel(){
     "Id",h("input",{type:"text",id:"rid"}),"Name",h("input",{type:"text",id:"rname"}),
     "Lat",num("rlat",s.a.lat),"Lon",num("rlon",s.a.lon)),
     h("div",{style:"margin-top:8px"},h("button",{onclick:()=>act(()=>api("/api/repeaters",{id:v("rid"),name:v("rname"),lat:+v("rlat"),lon:+v("rlon"),placed:true,status:"unknown"}))},"Save repeater"))));
+  if(S.repeaters.length){
+    b.append(h("h3",null,"Repeater passwords"));
+    b.append(h("div",{class:"sub"},"Used to log in to a repeater so CrewAware can read it. Stored encrypted, never shown again. Leave the box empty and press Remove to delete one."));
+    if(!credSel||!S.repeaters.some(r=>r.id===credSel))credSel=S.repeaters[0].id;
+    b.append(h("div",{class:"card"},h("div",{class:"grid2"},
+      "Repeater",h("select",{id:"credRep",onchange:ev=>{credSel=ev.target.value;}},
+        S.repeaters.map(r=>h("option",{value:r.id,selected:r.id===credSel},r.name+(r.has_credentials?" (password stored)":"")))),
+      "Password",h("input",{type:"password",id:"credPw",autocomplete:"off",maxlength:128})),
+      h("div",{style:"margin-top:8px;display:flex;gap:8px"},
+        h("button",{class:"pri",onclick:()=>{const pw=v("credPw");if(!pw){errMsg="Type a password first.";forceBody=true;render();return;}act(()=>api(`/api/repeaters/${encodeURIComponent(v("credRep"))}/credentials`,{password:pw}));}},"Save password"),
+        h("button",{onclick:()=>act(()=>api(`/api/repeaters/${encodeURIComponent(v("credRep"))}/credentials`,{password:""}))},"Remove"))));
+  }
   return b;
 }
+let credSel=null;
 const v=id=>document.getElementById(id).value;
 function saveSite(){
   act(()=>api("/api/site",{name:v("siteNameIn"),slogan:v("sloganIn"),

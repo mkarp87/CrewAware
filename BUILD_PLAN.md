@@ -226,6 +226,7 @@ Each spike should end with a written result in this repo.
 - **M1, live map:** gateway service, SQLite, WebSocket, a map with unit markers and ages. Works with the simulator and real hardware.
 - **M2, overlay and site profiles:** overlay upload and two-point pinning, site export and import, active-site switch with confirmation.
 - **M3, dispatch:** place incident, nearest units (straight line), confirm dispatch, status dropdowns, activity log, seat names, double-dispatch protection.
+- **M4a, repeater reads (decided November 2026):** CrewAware logs in to repeaters itself and reads their status; no separate admin tool and no writes. Passwords are stored encrypted with a key from `.env`. Reads are slow, one at a time, and rate limited because they share airtime with position reports. Built and tested against a simulated reader; the real reader depends on spike S-radio with hardware.
 - **M4, check-ins and repeaters:** contact rules, polling, repeater status and placement, alerts.
 - **M5, obstacles and ETA:** drawing tools, routing, vehicle groups, mph ETA, no-route handling.
 - **M6, packaging:** builds and service install for all three targets, first-run setup, backups.

@@ -1,4 +1,4 @@
-use crate::app::App;
+use crate::app::{App, RefreshError};
 use axum::body::Bytes;
 use axum::extract::{DefaultBodyLimit, Path, Query, State};
 use axum::http::{header, HeaderMap, HeaderValue, StatusCode};
@@ -107,6 +107,8 @@ pub fn router(app: Arc<App>) -> Router {
         .route("/api/units/{id}/group", post(assign_group))
         .route("/api/groups", post(set_group))
         .route("/api/repeaters", post(set_repeater))
+        .route("/api/repeaters/{id}/credentials", post(set_credentials))
+        .route("/api/repeaters/{id}/refresh", post(refresh_repeater))
         .route("/api/site", post(set_site))
         .route("/api/settings", post(set_settings))
         .route("/api/position", post(inject_position))
@@ -350,6 +352,66 @@ async fn set_repeater(State(app): Shared, h: HeaderMap, Json(b): Json<RepeaterBo
     require_admin(&app, &h).await?;
     app.with(|e| e.set_repeater(&b.id, &b.name, b.lat, b.lon, b.placed))?;
     ok()
+}
+
+#[derive(Deserialize)]
+struct CredentialsBody {
+    /// Empty removes the stored password.
+    password: String,
+}
+
+/// Stores (or removes) the password the app uses to log in to a repeater. It is never sent back.
+async fn set_credentials(
+    State(app): Shared,
+    h: HeaderMap,
+    Path(id): Path<String>,
+    Json(b): Json<CredentialsBody>,
+) -> Res {
+    require_admin(&app, &h).await?;
+    if !app.read(|e| e.repeater_exists(&id)) {
+        return Err(EngineError::NotFound.into());
+    }
+    if b.password.chars().count() > 128 {
+        return Err(bad("password is too long"));
+    }
+    // A repeater added a moment ago may still be waiting to be saved, and passwords reference it.
+    app.flush().await;
+    if b.password.is_empty() {
+        app.store.delete_repeater_password(&id).await?;
+    } else {
+        if !app.store.credentials_enabled() {
+            return Err(ApiError(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "CREWAWARE_SECRET_KEY is not set, so repeater passwords cannot be stored".into(),
+            ));
+        }
+        app.store.set_repeater_password(&id, &b.password).await?;
+    }
+    let has = !b.password.is_empty();
+    app.with(|e| e.set_has_credentials(&id, has))?;
+    app.touch();
+    ok()
+}
+
+/// Queues an immediate read of one repeater. Admin only, and rate limited per repeater.
+async fn refresh_repeater(State(app): Shared, h: HeaderMap, Path(id): Path<String>) -> Res {
+    require_admin(&app, &h).await?;
+    match app.read(|e| e.repeater_exists(&id).then(|| e.credentialed_repeaters().contains(&id))) {
+        None => return Err(EngineError::NotFound.into()),
+        Some(false) => return Err(bad("no password is stored for this repeater")),
+        Some(true) => {}
+    }
+    match app.request_refresh(&id) {
+        Ok(()) => Ok(Json(json!({ "ok": true, "queued": true }))),
+        Err(RefreshError::NoGateway) => Err(ApiError(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "no radio gateway is configured yet, so repeaters cannot be read".into(),
+        )),
+        Err(RefreshError::TooSoon(secs)) => Err(ApiError(
+            StatusCode::TOO_MANY_REQUESTS,
+            format!("this repeater was read a moment ago, try again in {secs} s"),
+        )),
+    }
 }
 
 #[derive(Deserialize)]

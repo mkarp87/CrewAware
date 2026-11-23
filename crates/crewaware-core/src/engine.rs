@@ -19,6 +19,10 @@ pub enum EngineError {
 pub enum Change {
     Unit(Unit),
     Repeater(Repeater),
+    Reading {
+        repeater_id: String,
+        reading: RepeaterReading,
+    },
     Incident(Incident),
     Log(LogEntry),
     Site(Site),
@@ -214,6 +218,65 @@ impl Engine {
             let r = r.clone();
             self.pending.push(Change::Repeater(r));
         }
+    }
+
+    /// Records the outcome of reading a repeater. A successful read proves the repeater is alive,
+    /// so it also counts as a check-in; a failed read changes nothing about its contact state.
+    pub fn record_reading(
+        &mut self,
+        repeater_id: &str,
+        ok: bool,
+        error: &str,
+        data: serde_json::Value,
+    ) -> Result<(), EngineError> {
+        let r = self
+            .repeaters
+            .iter_mut()
+            .find(|r| r.id == repeater_id)
+            .ok_or(EngineError::NotFound)?;
+        let now = Utc::now();
+        let reading = RepeaterReading {
+            read_at: now,
+            ok,
+            error: error.to_string(),
+            data,
+        };
+        r.reading = Some(reading.clone());
+        if ok {
+            r.last_seen = Some(now);
+            r.seen_mono = Some(Instant::now());
+            let r = r.clone();
+            self.pending.push(Change::Repeater(r));
+        }
+        self.pending.push(Change::Reading {
+            repeater_id: repeater_id.into(),
+            reading,
+        });
+        Ok(())
+    }
+
+    /// Called by the app after a password is stored or removed.
+    pub fn set_has_credentials(&mut self, repeater_id: &str, has: bool) -> Result<(), EngineError> {
+        let r = self
+            .repeaters
+            .iter_mut()
+            .find(|r| r.id == repeater_id)
+            .ok_or(EngineError::NotFound)?;
+        r.has_credentials = has;
+        Ok(())
+    }
+
+    pub fn repeater_exists(&self, id: &str) -> bool {
+        self.repeaters.iter().any(|r| r.id == id)
+    }
+
+    /// Repeaters that have a stored password, in a stable order, for the poller.
+    pub fn credentialed_repeaters(&self) -> Vec<String> {
+        self.repeaters
+            .iter()
+            .filter(|r| r.has_credentials)
+            .map(|r| r.id.clone())
+            .collect()
     }
 
     // ---- snapshot ----
@@ -491,6 +554,8 @@ impl Engine {
                     lon,
                     placed,
                     last_seen: None,
+                    has_credentials: false,
+                    reading: None,
                     seen_mono: None,
                 };
                 self.repeaters.push(r.clone());
@@ -803,6 +868,40 @@ mod tests {
             .iter()
             .any(|c| matches!(c, Change::Unit(u) if u.id == "a" && u.status == Status::Dispatched)));
         assert!(e.drain_changes().is_empty());
+    }
+
+    #[test]
+    fn successful_reading_counts_as_check_in_failed_does_not() {
+        let mut e = eng();
+        e.set_repeater("r1", "R1", 39.0, -104.0, true).unwrap();
+        e.drain_changes();
+        e.record_reading("r1", false, "no response", serde_json::Value::Null)
+            .unwrap();
+        let snap = e.snapshot();
+        assert_eq!(snap.repeaters[0].contact, Contact::NoContact);
+        assert!(!snap.repeaters[0].repeater.reading.as_ref().unwrap().ok);
+        e.record_reading("r1", true, "", serde_json::json!({ "battery_mv": 4100 }))
+            .unwrap();
+        let snap = e.snapshot();
+        assert_eq!(snap.repeaters[0].contact, Contact::Normal);
+        assert_eq!(
+            snap.repeaters[0].repeater.reading.as_ref().unwrap().data["battery_mv"],
+            4100
+        );
+        assert!(matches!(
+            e.record_reading("nope", true, "", serde_json::Value::Null),
+            Err(EngineError::NotFound)
+        ));
+    }
+
+    #[test]
+    fn credentialed_repeaters_listed() {
+        let mut e = eng();
+        e.set_repeater("r1", "R1", 0.0, 0.0, false).unwrap();
+        e.set_repeater("r2", "R2", 0.0, 0.0, false).unwrap();
+        e.set_has_credentials("r2", true).unwrap();
+        assert_eq!(e.credentialed_repeaters(), vec!["r2".to_string()]);
+        assert!(e.set_has_credentials("zz", true).is_err());
     }
 
     #[test]
