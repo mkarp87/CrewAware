@@ -9,55 +9,61 @@ Incident-command app for tracking utility vehicles on an event site.
 - Runs offline, as a single self-contained app on Raspberry Pi, Linux or Windows
 - Position data comes from MeshCore LoRa trackers through a USB companion node
 
-Status: early build. A working server and web UI run against a built-in simulator. The real MeshCore radio gateway is not written yet, because it depends on the hardware spikes. See [BUILD_PLAN.md](BUILD_PLAN.md) for scope, architecture, rules, spikes and milestones.
+Status: early build. The server and web UI run against a built-in simulator. The real MeshCore radio gateway is not written yet, because it depends on the hardware spikes. See [BUILD_PLAN.md](BUILD_PLAN.md) for scope, architecture, rules, spikes and milestones.
 
-## Try it
+CrewAware is a Rust app built and deployed the same way as DMR-Master-System: Docker Compose with PostgreSQL 17, a `.env` file, migrations run by the app at startup, and admin accounts for setup.
 
-You need Go 1.22 or newer. The server uses only the standard library.
+## Run it
 
-```
-cd server
-go run . -sim            # then open http://localhost:8080
-go test -race ./...
-```
-
-`-sim` seeds a demo site with moving and parked units and three repeaters. Without it you get an empty site. Data is kept in `./data` (override with `-data`). Open the page, type a seat name in the header, click **Place incident**, then click the map.
-
-Cross-compile one self-contained binary per target:
+You need Docker with Compose v2.
 
 ```
-CGO_ENABLED=0 GOOS=linux   GOARCH=arm64 go build -o crewaware-pi .
-CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o crewaware.exe .
+cp .env.example .env     # set POSTGRES_PASSWORD and CREWAWARE_ADMIN_PASSWORD (12+ characters)
+                         # and set CREWAWARE_SIM=1 to try it with simulated units
+docker compose up -d --build
 ```
 
-## Run in a container
+Open http://localhost:8080. Type a seat name in the header, click **Place incident**, then click the map. Open the **Setup** tab and log in as the admin to set the site name, logo, slogan, overlay image and anchors, vehicle groups, units, repeaters and the contact rules.
+
+Change the admin password later with:
 
 ```
-docker compose up --build        # demo mode with the simulator, http://localhost:8080
+echo 'a new password here' | docker compose exec -T crewaware crewaware set-password admin
 ```
 
-Data lives in the `crewaware-data` volume. Remove `command: ["-sim"]` in `docker-compose.yml` for a real site. USB passthrough for the radio only works on Linux hosts, so on Windows and macOS run the plain binary instead once the gateway exists. The container still uses the JSON-file store. A Postgres option needs a Go driver module, which is not added yet.
+## Develop
+
+```
+cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace                       # engine tests; no database needed
+TEST_DATABASE_URL=postgres://user:pw@localhost/crewaware_scratch cargo test -p crewaware-store   # wipes that database
+DATABASE_URL=postgres://user:pw@localhost/crewaware CREWAWARE_SIM=1 CREWAWARE_ADMIN_PASSWORD='12+ characters here' cargo run -p crewaware
+```
 
 ## What works now (milestones M1 to M3, partly)
 
 - Live map over an uploaded overlay image, pinned with two anchors (north-up images only)
-- Units by status, with contact state (normal, late, no contact) from report age, using parked and moving thresholds
-- Place an incident, see available units ranked by straight-line distance with ETA from the vehicle group's max mph
+- Units by status, with contact state (normal, late, no contact) from report age, using parked and moving thresholds you can edit
+- Place an incident and see available units ranked by straight-line distance, with an ETA from the vehicle group's max mph
 - Dispatch is all-or-nothing and refuses a unit another seat already took
-- Manual status per unit, on scene, close incident, activity log with seat names
-- Repeaters with check-in status; vehicle groups; logo and slogan branding
-- State saved to a JSON file; ages use the monotonic clock, so a clock jump cannot change contact states
+- Manual status per unit, on scene, close incident, and an activity log with seat names
+- Repeaters with check-in status, vehicle groups, logo and slogan branding
+- PostgreSQL stores configuration, incidents, the log and a throttled position history; overlay images are stored there too, so one backup covers everything
+- Admin login (argon2 password hashes, session cookies, login throttling) protects Setup; dispatching needs no login
+- Ages use the monotonic clock, so a wall-clock jump cannot change contact states, and a restart shows no contact until a unit reports again
 
 ## Not done yet
 
-- MeshCore USB gateway (transport interface exists, simulator implements it)
+- MeshCore USB gateway (the simulator stands in for it)
 - Obstacles and routed ETA, site profile export/import and site switching
-- SQLite storage and WebSocket. The build environment could not fetch third-party Go modules, so storage is a JSON file behind the `Store` type and live updates use Server-Sent Events. Both can be swapped later.
-- Repeater drag-to-place on the map, polling of silent units, alerts, authentication
+- Repeater drag-to-place on the map, polling of silent units, alerts, report exports
 
 ## Layout
 
 ```
-server/     Go server: engine, contact rules, geo, simulator, HTTP API, embedded web UI (server/web)
-docs/       mockup source and notes
+apps/crewaware/        axum server, API, live updates (SSE), simulator, embedded web UI (web/)
+crates/crewaware-core/ model, contact rules, geometry, the in-memory engine (no I/O)
+crates/crewaware-store/ PostgreSQL storage, admin accounts, assets
+migrations/            SQL schema, applied by the app at startup
+docs/                  mockup source and notes
 ```

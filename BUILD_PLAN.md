@@ -162,7 +162,9 @@ Notes:
 
 Targets: Linux x86-64, Linux ARM64 (Raspberry Pi 4 or 5, 64-bit OS) and Windows x86-64.
 
-**Install shape**
+**Decision (November 2026):** CrewAware is built in Rust and deployed like DMR-Master-System: Docker Compose with PostgreSQL 17 and the app, settings in a `.env` file, schema migrations run by the app at startup, admin accounts for setup. The server is therefore not a single self-contained binary any more. The older single-binary-with-SQLite shape below is kept as an option for a standalone laptop or Pi with no Docker. The radio gateway has to run where the USB companion node is plugged in, and Docker Desktop on macOS and Windows cannot pass USB serial devices into a container, so on those systems the gateway will run as a native process next to the containers.
+
+**Install shape (original plan)**
 - One native binary per target with the web UI embedded and SQLite built in. No runtime to install.
 - Native binaries are the primary install. Docker is optional on Linux and Pi only. On Windows, passing USB serial into Docker is painful, which is why Docker is not the main path.
 - Run as a systemd service on Linux and as a Windows service. Both start at boot and restart on failure.

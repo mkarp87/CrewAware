@@ -1,19 +1,57 @@
 services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: crewaware
+      POSTGRES_USER: crewaware
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    # Not published to the host: only the app container needs it.
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U crewaware -d crewaware"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
   crewaware:
+    image: ${CREWAWARE_IMAGE:-crewaware}:${CREWAWARE_VERSION:-local}
     build: .
-    image: crewaware:latest
     restart: unless-stopped
     ports:
-      - "8080:8080"
-    volumes:
-      - crewaware-data:/data
-    # Demo mode with the simulator. Remove this line for a real site.
-    command: ["-sim"]
-    # When the MeshCore USB gateway exists, pass the companion node through (Linux hosts only):
+      - "${CREWAWARE_PORT:-8080}:8080"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    environment:
+      RUST_LOG: ${RUST_LOG:-info}
+      DATABASE_URL: postgresql://crewaware:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/crewaware
+      CREWAWARE_HTTP_BIND: 0.0.0.0:8080
+      CREWAWARE_ADMIN_USERNAME: ${CREWAWARE_ADMIN_USERNAME:-admin}
+      CREWAWARE_ADMIN_PASSWORD: ${CREWAWARE_ADMIN_PASSWORD:?set CREWAWARE_ADMIN_PASSWORD in .env}
+      CREWAWARE_SIM: ${CREWAWARE_SIM:-0}
+      CREWAWARE_SIM_PARKED_SECS: ${CREWAWARE_SIM_PARKED_SECS:-900}
+      CREWAWARE_COOKIE_SECURE: ${CREWAWARE_COOKIE_SECURE:-0}
+    # When the MeshCore USB gateway exists and the host is Linux, pass the companion node through:
     # devices:
     #   - /dev/ttyACM0:/dev/ttyACM0
     # group_add:
     #   - dialout
+    depends_on:
+      postgres:
+        condition: service_healthy
 
 volumes:
-  crewaware-data:
+  postgres-data:

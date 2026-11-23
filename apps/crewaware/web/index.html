@@ -88,6 +88,7 @@ let errMsg="";
 let view={x:0,y:0,k:1};// pan/zoom: screen = (p*k)+x
 let fitted=false;
 let dragging=null;
+let adminState={admin:false};
 
 // ---------- helpers ----------
 function h(tag,attrs,...kids){
@@ -112,6 +113,7 @@ async function api(path,body,method){
   if(body instanceof Blob)opt.body=body;
   const r=await fetch(path,opt);
   const j=await r.json().catch(()=>({}));
+  if(r.status===401&&path!=="/api/admin/login"){adminState={admin:false};}
   if(!r.ok)throw new Error(j.error||r.statusText);
   return j;
 }
@@ -126,7 +128,7 @@ function fmtAge(s){
 }
 function fmtDist(ft){return ft<1000?Math.round(ft)+" ft":(ft/5280).toFixed(2)+" mi";}
 function fmtEta(sec){
-  if(!isFinite(sec))return "n/a";
+  if(sec==null||!isFinite(sec))return "n/a";
   if(sec<90)return Math.round(sec)+" s";
   return Math.round(sec/60)+" min";
 }
@@ -334,8 +336,41 @@ function logPanel(){
   if(!S.log.length)d.append(h("p",{class:"sub"},"Nothing yet."));
   return d;
 }
+function loginPanel(){
+  const b=h("div");
+  b.append(h("h3",null,"Admin login"));
+  b.append(h("div",{class:"sub"},"Setup changes the site, units, repeaters and branding, so it needs an admin account. Dispatching does not."));
+  b.append(h("div",{class:"card"},h("div",{class:"grid2"},
+    "Username",h("input",{type:"text",id:"lu",autocomplete:"username"}),
+    "Password",h("input",{type:"password",id:"lp",autocomplete:"current-password",onkeydown:ev=>{if(ev.key==="Enter")doLogin();}})),
+    h("div",{style:"margin-top:8px"},h("button",{class:"pri",onclick:doLogin},"Log in"))));
+  return b;
+}
+async function doLogin(){
+  try{
+    errMsg="";
+    await api("/api/admin/login",{username:v("lu"),password:document.getElementById("lp").value});
+    adminState=await api("/api/admin/me");
+  }catch(e){errMsg=e.message;}
+  forceBody=true;render();
+}
+async function doLogout(){
+  try{await api("/api/admin/logout",{});}catch(e){}
+  adminState={admin:false};forceBody=true;render();
+}
 function setupPanel(){
+  if(!adminState.admin)return loginPanel();
   const s=S.site, b=h("div");
+  b.append(h("div",{class:"row"},h("div",{class:"nm sub"},"Signed in as "+adminState.username),h("button",{onclick:doLogout},"Log out")));
+  const st=S.settings;
+  b.append(h("h3",null,"Contact rules (minutes)"));
+  b.append(h("div",{class:"card"},h("div",{class:"grid2"},
+    "Parked late after",h("input",{type:"number",step:"any",id:"s1",value:st.parked_late_min}),
+    "Parked no contact after",h("input",{type:"number",step:"any",id:"s2",value:st.parked_no_contact_min}),
+    "Moving late after",h("input",{type:"number",step:"any",id:"s3",value:st.moving_late_min}),
+    "Moving no contact after",h("input",{type:"number",step:"any",id:"s4",value:st.moving_no_contact_min}),
+    "Counts as moving at (mph)",h("input",{type:"number",step:"any",id:"s5",value:st.moving_min_mph})),
+    h("div",{style:"margin-top:8px"},h("button",{onclick:()=>act(()=>api("/api/settings",{parked_late_min:+v("s1"),parked_no_contact_min:+v("s2"),moving_late_min:+v("s3"),moving_no_contact_min:+v("s4"),moving_min_mph:+v("s5")}))},"Save rules"))));
   const num=(id,v)=>h("input",{type:"number",step:"any",id,value:v,style:"width:100%"});
   b.append(h("h3",null,"Site"));
   b.append(h("div",{class:"card"},h("div",{class:"grid2"},
@@ -380,15 +415,20 @@ function saveSite(){
     a:{px:+v("apx"),py:+v("apy"),lat:+v("alat"),lon:+v("alon")},
     b:{px:+v("bpx"),py:+v("bpy"),lat:+v("blat"),lon:+v("blon")}}));
 }
+// Uploads must not rebuild the Setup form, or any unsaved text the admin typed would be lost.
+async function sendFile(file,kind,query){
+  try{errMsg="";await api("/api/site/"+kind+query,file);}
+  catch(e){errMsg=e.message;forceBody=true;render();return;}
+  drawOnly();
+}
 function upload(file,kind){
   if(!file)return;
-  const finish=(q)=>act(()=>api("/api/site/"+kind+q,file));
   if(kind==="overlay"){
     const img=new Image(), url=URL.createObjectURL(file);
-    img.onload=()=>{URL.revokeObjectURL(url); fitted=false; finish(`?w=${img.naturalWidth}&h=${img.naturalHeight}`);};
-    img.onerror=()=>{errMsg="Could not read that image.";render();};
+    img.onload=()=>{URL.revokeObjectURL(url); fitted=false; sendFile(file,kind,`?w=${img.naturalWidth}&h=${img.naturalHeight}`);};
+    img.onerror=()=>{errMsg="Could not read that image.";forceBody=true;render();};
     img.src=url;
-  }else finish("");
+  }else sendFile(file,kind,"");
 }
 
 // ---------- render ----------
@@ -448,6 +488,7 @@ document.getElementById("seat").addEventListener("input",e=>localStorage.setItem
 // After an action in Setup, rebuild the form so saved values show.
 const _act=act;
 act=async function(fn){forceBody=true;await _act(fn);};
+api("/api/admin/me").then(m=>{adminState=m;}).catch(()=>{});
 connect();
 </script>
 </body>
