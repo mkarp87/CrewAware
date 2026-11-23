@@ -1,0 +1,18 @@
+{
+  "v": 3,
+  "createdOnFiles": { "v": 1, "at": "2026-11-22T18:20:00Z" },
+  "title": "CrewAware – Incident Command Mockup",
+  "launch": { "view": "canvas" },
+  "pages": [],
+  "boards": {
+    "Main.dc.html": { "x": 0, "y": 0, "w": 1440, "h": 1040, "title": "1 · Command view (interactive)", "expand": "fill", "is_interactive": true },
+    "Sites.dc.html": { "x": 1520, "y": 0, "w": 1440, "h": 1040, "title": "2 · Site and overlay setup (interactive branding)", "expand": "fill", "is_interactive": true },
+    "States.dc.html": { "x": 0, "y": 1160, "w": 1440, "h": 820, "title": "3 · Status and check-in rules" },
+    "DataModel.dc.html": { "x": 1520, "y": 1160, "w": 1440, "h": 1100, "title": "4 · Data model", "expand": "fill" }
+  },
+  "order": ["Main.dc.html", "Sites.dc.html", "States.dc.html", "DataModel.dc.html"],
+  "notes": {
+    "t1": { "x": 0, "y": -300, "text": "CrewAware – Incident Command", "kind": "title1", "maxW": 2960 }
+  },
+  "designSystems": []
+}

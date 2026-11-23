@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Site and overlay setup</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+body{margin:0;font-family:Inter,system-ui,sans-serif;color:#14181f;background:#eef1f5}
+button,select,input{font-family:inherit}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid #1d5fd1;outline-offset:2px}
+</style>
+</helmet>
+<div style="min-height:1040px;display:flex;flex-direction:column;background:#eef1f5">
+
+<header style="background:#14181f;color:#ffffff;display:flex;flex-wrap:wrap;align-items:center;gap:16px;padding:12px 24px">
+<div style="font-weight:700;font-size:18px">CrewAware</div>
+<div style="font-size:14px;color:#c9d0da">Site setup</div>
+<a href="Main.dc.html" style="margin-left:auto;color:#ffffff;font-size:13px;border:1px solid #8b93a1;border-radius:6px;padding:8px 12px;text-decoration:none">Back to command view</a>
+</header>
+
+<div style="display:flex;flex-wrap:wrap;gap:16px;padding:16px 24px;align-items:flex-start">
+
+<aside style="flex:1 1 260px;max-width:300px;min-width:0;display:flex;flex-direction:column;gap:12px">
+<section style="background:#ffffff;border:1px solid #cfd5de;border-radius:10px;overflow:hidden">
+<div style="padding:10px 12px;font-weight:700;font-size:14px;border-bottom:1px solid #e3e7ed">Sites</div>
+<div style="padding:12px;background:#eaf0fb;border-bottom:1px solid #e3e7ed">
+<div style="font-weight:600;font-size:14px">Airshow grounds</div>
+<div style="font-size:12px;color:#566070">Overlay loaded · 1 gateway · 4 repeaters · 7 units</div>
+</div>
+<div style="padding:12px;border-bottom:1px solid #e3e7ed">
+<div style="font-weight:600;font-size:14px">Hangar row</div>
+<div style="font-size:12px;color:#566070">No overlay yet · basemap only</div>
+</div>
+<div style="padding:12px"><button style="min-height:44px;width:100%;border-radius:8px;border:1px dashed #566070;background:#ffffff;color:#14181f;font-size:14px;font-weight:600;cursor:pointer">New site</button></div>
+</section>
+<section style="background:#ffffff;border:1px solid #cfd5de;border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:10px">
+<div style="font-weight:700;font-size:14px">Gateway for this site</div>
+<label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:#566070">Companion node connection
+<select style="min-height:40px;font-size:14px;padding:0 8px;border-radius:6px;border:1px solid #8b93a1;background:#ffffff;color:#14181f"><option>USB serial</option><option>TCP / WiFi</option></select></label>
+<label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:#566070">Serial path
+<input type="text" value="/dev/serial/by-id/[YOUR-DEVICE]" style="min-height:40px;font-size:14px;padding:0 8px;border-radius:6px;border:1px solid #8b93a1;color:#14181f"></label>
+</section>
+</aside>
+
+<main style="flex:999 1 560px;min-width:0;display:flex;flex-direction:column;gap:12px">
+<section style="background:#ffffff;border:1px solid #cfd5de;border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:12px">
+<div>
+<div style="font-weight:700;font-size:16px">Branding for this site</div>
+<div style="font-size:13px;color:#566070">Shown in the header of every page while this site is active. Saved with the site profile, so each event can have its own logo and slogan.</div>
+</div>
+<div style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start">
+<div style="flex:1 1 260px;display:flex;flex-direction:column;gap:8px">
+<div style="font-size:12px;color:#566070">Logo</div>
+<div style="display:flex;align-items:center;justify-content:center;height:72px;border:1px dashed #8b93a1;border-radius:8px;background:#f6f8fa;color:#566070;font-size:13px">
+<sc-if value="{{hasLogo}}" hint-placeholder-val="{{ false }}"><span style="font-weight:600;color:#14181f">Sample logo uploaded</span></sc-if>
+<sc-if value="{{noLogo}}" hint-placeholder-val="{{ true }}"><span>No logo uploaded</span></sc-if>
+</div>
+<div style="display:flex;gap:8px">
+<button onClick="{{uploadLogo}}" style="min-height:44px;padding:0 16px;border-radius:8px;border:0;background:#1d5fd1;color:#ffffff;font-size:14px;font-weight:600;cursor:pointer">Upload logo</button>
+<button onClick="{{removeLogo}}" disabled="{{noLogo}}" style="min-height:44px;padding:0 16px;border-radius:8px;border:1px solid #566070;background:#ffffff;color:#14181f;font-size:14px;cursor:pointer">Remove</button>
+</div>
+<label style="display:flex;align-items:center;gap:8px;font-size:13px"><input type="checkbox" checked="{{chip}}" onChange="{{toggleChip}}">Place the logo on a white background (for dark logos)</label>
+<div style="font-size:12px;color:#566070">PNG, SVG or JPG, up to 1 MB. Shown about 40 px tall. A transparent background works best.</div>
+</div>
+<div style="flex:1 1 260px;display:flex;flex-direction:column;gap:8px">
+<label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:#566070">Slogan
+<input type="text" maxlength="60" value="{{slogan}}" onChange="{{onSlogan}}" style="min-height:44px;font-size:14px;padding:0 10px;border-radius:6px;border:1px solid #8b93a1;color:#14181f"></label>
+<div style="font-size:12px;color:#566070">{{sloganLen}} of 60 characters. Leave empty to show no slogan.</div>
+</div>
+</div>
+<div style="font-size:12px;color:#566070">Header preview</div>
+<div style="background:#14181f;color:#ffffff;display:flex;flex-wrap:wrap;align-items:center;gap:16px;padding:12px 16px;border-radius:8px">
+<sc-if value="{{hasLogo}}" hint-placeholder-val="{{ false }}"><div style="height:40px;min-width:120px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;border-radius:6px;font-size:13px;font-weight:700;padding:0 12px;background:{{logoBg}};color:{{logoFg}};border:{{logoBorder}}">LOGO</div></sc-if>
+<div style="display:flex;flex-direction:column">
+<div style="font-weight:700;font-size:18px;line-height:22px">CrewAware</div>
+<sc-if value="{{hasSlogan}}" hint-placeholder-val="{{ true }}"><div style="font-size:12px;line-height:16px;color:#c9d0da">{{slogan}}</div></sc-if>
+</div>
+</div>
+</section>
+<section style="background:#ffffff;border:1px solid #cfd5de;border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:12px">
+<div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px">
+<div style="flex:1 1 280px">
+<div style="font-weight:700;font-size:16px">Overlay for Airshow grounds</div>
+<div style="font-size:13px;color:#566070">Upload a site plan, then pin it to the real map with two reference points.</div>
+</div>
+<button style="min-height:44px;padding:0 16px;border-radius:8px;border:0;background:#1d5fd1;color:#ffffff;font-size:14px;font-weight:600;cursor:pointer">Replace overlay image</button>
+</div>
+
+<div style="position:relative;width:100%;aspect-ratio:1095/495;border:1px solid #b9c1cc;border-radius:8px;overflow:hidden;background:#dfe5ec">
+<img src="/_blob/8fc8237603b9100aa2440e4ef4bb37ae" alt="Overlay image being georeferenced, with anchor points A and B placed" style="position:absolute;left:0;top:0;width:100%;height:100%">
+<div style="position:absolute;left:14%;top:26%;width:0;height:0">
+<div style="position:absolute;left:-14px;top:-14px;width:28px;height:28px;box-sizing:border-box;border-radius:50%;border:3px solid #ffffff;background:#1d5fd1;color:#ffffff;font-size:13px;font-weight:700;text-align:center;line-height:22px;box-shadow:0 1px 3px rgba(0,0,0,0.5)">A</div>
+</div>
+<div style="position:absolute;left:86%;top:80%;width:0;height:0">
+<div style="position:absolute;left:-14px;top:-14px;width:28px;height:28px;box-sizing:border-box;border-radius:50%;border:3px solid #ffffff;background:#1d5fd1;color:#ffffff;font-size:13px;font-weight:700;text-align:center;line-height:22px;box-shadow:0 1px 3px rgba(0,0,0,0.5)">B</div>
+</div>
+</div>
+
+<div style="display:flex;flex-wrap:wrap;gap:16px">
+<fieldset style="flex:1 1 280px;border:1px solid #cfd5de;border-radius:8px;padding:12px;margin:0;display:flex;flex-direction:column;gap:8px">
+<legend style="font-size:13px;font-weight:600;padding:0 6px">Point A</legend>
+<label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:#566070">Latitude<input type="text" value="[LAT A]" style="min-height:40px;font-size:14px;padding:0 8px;border-radius:6px;border:1px solid #8b93a1;color:#14181f"></label>
+<label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:#566070">Longitude<input type="text" value="[LON A]" style="min-height:40px;font-size:14px;padding:0 8px;border-radius:6px;border:1px solid #8b93a1;color:#14181f"></label>
+</fieldset>
+<fieldset style="flex:1 1 280px;border:1px solid #cfd5de;border-radius:8px;padding:12px;margin:0;display:flex;flex-direction:column;gap:8px">
+<legend style="font-size:13px;font-weight:600;padding:0 6px">Point B</legend>
+<label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:#566070">Latitude<input type="text" value="[LAT B]" style="min-height:40px;font-size:14px;padding:0 8px;border-radius:6px;border:1px solid #8b93a1;color:#14181f"></label>
+<label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:#566070">Longitude<input type="text" value="[LON B]" style="min-height:40px;font-size:14px;padding:0 8px;border-radius:6px;border:1px solid #8b93a1;color:#14181f"></label>
+</fieldset>
+</div>
+<div style="font-size:12px;color:#566070">Drag A and B on the image to two landmarks you can find on the satellite map, such as building corners or road crossings, then enter their coordinates. The app works out scale and rotation from the two points and places every unit and repeater on the overlay.</div>
+</section>
+
+<section style="background:#ffffff;border:1px solid #cfd5de;border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:12px">
+<div style="font-weight:700;font-size:16px">Check-in rules for this site</div>
+<div style="display:flex;flex-wrap:wrap;gap:16px">
+<label style="flex:1 1 200px;display:flex;flex-direction:column;gap:4px;font-size:12px;color:#566070">Parked units check in every (min)<input type="number" value="15" style="min-height:40px;font-size:14px;padding:0 8px;border-radius:6px;border:1px solid #8b93a1;color:#14181f"></label>
+<label style="flex:1 1 200px;display:flex;flex-direction:column;gap:4px;font-size:12px;color:#566070">Parked: no contact after (min)<input type="number" value="30" style="min-height:40px;font-size:14px;padding:0 8px;border-radius:6px;border:1px solid #8b93a1;color:#14181f"></label>
+<label style="flex:1 1 200px;display:flex;flex-direction:column;gap:4px;font-size:12px;color:#566070">Moving: late after (min)<input type="number" value="2" style="min-height:40px;font-size:14px;padding:0 8px;border-radius:6px;border:1px solid #8b93a1;color:#14181f"></label>
+<label style="flex:1 1 200px;display:flex;flex-direction:column;gap:4px;font-size:12px;color:#566070">Moving: no contact after (min)<input type="number" value="10" style="min-height:40px;font-size:14px;padding:0 8px;border-radius:6px;border:1px solid #8b93a1;color:#14181f"></label>
+</div>
+</section>
+</main>
+
+<aside style="flex:1 1 340px;max-width:400px;min-width:0;display:flex;flex-direction:column;gap:12px">
+<section style="background:#ffffff;border:1px solid #cfd5de;border-radius:10px;overflow:hidden">
+<div style="padding:10px 12px;font-weight:700;font-size:14px;border-bottom:1px solid #e3e7ed">Repeaters at this site</div>
+<div style="padding:10px 12px;border-bottom:1px solid #eef1f5;display:flex;align-items:center;gap:10px"><div style="flex:1"><div style="font-weight:600;font-size:14px">Repeater 1, hangar roof</div><div style="font-size:12px;color:#566070">Node ID [PUBLIC KEY] · placed on map</div></div><span style="font-size:12px;font-weight:600;background:#d9f0f5;color:#0b4a5c;border-radius:4px;padding:3px 8px">Online</span></div>
+<div style="padding:10px 12px;border-bottom:1px solid #eef1f5;display:flex;align-items:center;gap:10px"><div style="flex:1"><div style="font-weight:600;font-size:14px">Repeater 2, east gate</div><div style="font-size:12px;color:#566070">Node ID [PUBLIC KEY] · placed on map</div></div><span style="font-size:12px;font-weight:600;background:#d9f0f5;color:#0b4a5c;border-radius:4px;padding:3px 8px">Online</span></div>
+<div style="padding:10px 12px;border-bottom:1px solid #eef1f5;display:flex;align-items:center;gap:10px"><div style="flex:1"><div style="font-weight:600;font-size:14px">Repeater 3, fuel farm road</div><div style="font-size:12px;color:#566070">Node ID [PUBLIC KEY] · placed on map</div></div><span style="font-size:12px;font-weight:600;background:#ffe9c7;color:#6b3a00;border-radius:4px;padding:3px 8px">Degraded</span></div>
+<div style="padding:10px 12px;border-bottom:1px solid #eef1f5;display:flex;align-items:center;gap:10px"><div style="flex:1"><div style="font-weight:600;font-size:14px">Repeater 4, north ramp</div><div style="font-size:12px;color:#566070">Node ID [PUBLIC KEY] · placed on map</div></div><span style="font-size:12px;font-weight:600;background:#e3e6eb;color:#2b323c;border-radius:4px;padding:3px 8px">Offline</span></div>
+<div style="padding:12px"><button style="min-height:44px;width:100%;border-radius:8px;border:0;background:#0e7490;color:#ffffff;font-size:14px;font-weight:600;cursor:pointer">Add repeater</button></div>
+</section>
+<section style="background:#ffffff;border:1px solid #cfd5de;border-radius:10px;overflow:hidden">
+<div style="padding:10px 12px;font-weight:700;font-size:14px;border-bottom:1px solid #e3e7ed">Units at this site</div>
+<div style="padding:10px 12px;border-bottom:1px solid #eef1f5;font-size:13px"><b>UTV 1</b> · Node ID [PUBLIC KEY]</div>
+<div style="padding:10px 12px;border-bottom:1px solid #eef1f5;font-size:13px"><b>UTV 2</b> · Node ID [PUBLIC KEY]</div>
+<div style="padding:10px 12px;border-bottom:1px solid #eef1f5;font-size:13px"><b>UTV 3</b> · Node ID [PUBLIC KEY]</div>
+<div style="padding:12px"><button style="min-height:44px;width:100%;border-radius:8px;border:1px solid #566070;background:#ffffff;color:#14181f;font-size:14px;font-weight:600;cursor:pointer">Add unit</button></div>
+</section>
+</aside>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1040}}'>
+class Component extends DCLogic {
+  state = { hasLogo: false, chip: false, slogan: 'Your slogan here' };
+
+  renderVals() {
+    const s = this.state;
+    return {
+      hasLogo: s.hasLogo,
+      noLogo: !s.hasLogo,
+      chip: s.chip,
+      uploadLogo: () => this.setState({ hasLogo: true }),
+      removeLogo: () => this.setState({ hasLogo: false }),
+      toggleChip: () => this.setState({ chip: !s.chip }),
+      slogan: s.slogan,
+      sloganLen: s.slogan.length,
+      hasSlogan: s.slogan.length > 0,
+      onSlogan: (e) => this.setState({ slogan: e.target.value.slice(0, 60) }),
+      logoBg: s.chip ? '#ffffff' : 'transparent',
+      logoFg: s.chip ? '#14181f' : '#ffffff',
+      logoBorder: s.chip ? '1px solid #ffffff' : '1px dashed #8b93a1'
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Data model</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+body{margin:0;font-family:Inter,system-ui,sans-serif;color:#14181f;background:#eef1f5}
+</style>
+</helmet>
+<div style="min-height:1100px;display:flex;flex-direction:column;background:#eef1f5">
+
+<header style="background:#14181f;color:#ffffff;display:flex;flex-wrap:wrap;align-items:center;gap:16px;padding:12px 24px">
+<div style="font-weight:700;font-size:18px">CrewAware</div>
+<div style="font-size:14px;color:#c9d0da">Data model</div>
+<div style="margin-left:auto;font-size:13px;color:#c9d0da">Every table belongs to one site, so switching deployment sites switches the overlay, rules, units and repeaters together.</div>
+</header>
+
+<div style="display:flex;flex-wrap:wrap;gap:16px;padding:16px 24px;align-items:flex-start">
+
+<section style="flex:1 1 320px;min-width:0;background:#ffffff;border:1px solid #cfd5de;border-radius:10px;overflow:hidden">
+<div style="display:flex;align-items:center;gap:8px;padding:10px 12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:700;font-size:14px">sites</span><span style="font-size:11px;background:#dfe9fb;color:#173f8f;border-radius:4px;padding:2px 6px">Setup</span></div>
+<div style="display:flex;gap:8px;padding:5px 12px;border-top:1px solid #eef1f5;font-size:12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:600;min-width:120px">id</span><span style="color:#566070">uuid · primary key</span></div>
+<div style="display:flex;gap:8px;padding:5px 12px;border-top:1px solid #eef1f5;font-size:12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:600;min-width:120px">name</span><span style="color:#566070">text</span></div>
+<div style="display:flex;gap:8px;padding:5px 12px;border-top:1px solid #eef1f5;font-size:12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:600;min-width:120px">timezone</span><span style="color:#566070">text</span></div>
+<div style="display:flex;gap:8px;padding:5px 12px;border-top:1px solid #eef1f5;font-size:12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:600;min-width:120px">gateway_kind</span><span style="color:#566070">usb or tcp</span></div>
+<div style="display:flex;gap:8px;padding:5px 12px;border-top:1px solid #eef1f5;font-size:12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:600;min-width:120px">gateway_path</span><span style="color:#566070">text · serial path or host and port</span></div>
+<div style="display:flex;gap:8px;padding:5px 12px;border-top:1px solid #eef1f5;font-size:12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:600;min-width:120px">logo_url</span><span style="color:#566070">text · uploaded logo, optional</span></div>
+<div style="display:flex;gap:8px;padding:5px 12px;border-top:1px solid #eef1f5;font-size:12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:600;min-width:120px">slogan</span><span style="color:#566070">text · up to 60 characters</span></div>
+</section>
+
+<section style="flex:1 1 320px;min-width:0;background:#ffffff;border:1px solid #cfd5de;border-radius:10px;overflow:hidden">
+<div style="display:flex;align-items:center;gap:8px;padding:10px 12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:700;font-size:14px">overlays</span><span style="font-size:11px;background:#dfe9fb;color:#173f8f;border-radius:4px;padding:2px 6px">Setup</span></div>
+<div style="display:flex;gap:8px;padding:5px 12px;border-top:1px solid #eef1f5;font-size:12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:600;min-width:120px">id</span><span style="color:#566070">uuid · primary key</span></div>
+<div style="display:flex;gap:8px;padding:5px 12px;border-top:1px solid #eef1f5;font-size:12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:600;min-width:120px">site_id</span><span style="color:#566070">uuid · links to sites</span></div>
+<div style="display:flex;gap:8px;padding:5px 12px;border-top:1px solid #eef1f5;font-size:12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:600;min-width:120px">image_url</span><span style="color:#566070">text · the uploaded site plan</span></div>
+<div style="display:flex;gap:8px;padding:5px 12px;border-top:1px solid #eef1f5;font-size:12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:600;min-width:120px">anchor_a_px</span><span style="color:#566070">x, y on the image</span></div>
+<div style="display:flex;gap:8px;padding:5px 12px;border-top:1px solid #eef1f5;font-size:12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:600;min-width:120px">anchor_a_geo</span><span style="color:#566070">lat, lon</span></div>
+<div style="display:flex;gap:8px;padding:5px 12px;border-top:1px solid #eef1f5;font-size:12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:600;min-width:120px">anchor_b_px</span><span style="color:#566070">x, y on the image</span></div>
+<div style="display:flex;gap:8px;padding:5px 12px;border-top:1px solid #eef1f5;font-size:12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:600;min-width:120px">anchor_b_geo</span><span style="color:#566070">lat, lon</span></div>
+<div style="display:flex;gap:8px;padding:5px 12px;border-top:1px solid #eef1f5;font-size:12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:600;min-width:120px">default_opacity</span><span style="color:#566070">integer, percent</span></div>
+</section>
+
+<section style="flex:1 1 320px;min-width:0;background:#ffffff;border:1px solid #cfd5de;border-radius:10px;overflow:hidden">
+<div style="display:flex;align-items:center;gap:8px;padding:10px 12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:700;font-size:14px">site_rules</span><span style="font-size:11px;background:#dfe9fb;color:#173f8f;border-radius:4px;padding:2px 6px">Setup</span></div>
+<div style="display:flex;gap:8px;padding:5px 12px;border-top:1px solid #eef1f5;font-size:12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:600;min-width:150px">site_id</span><span style="color:#566070">uuid · primary key</span></div>
+<div style="display:flex;gap:8px;padding:5px 12px;border-top:1px solid #eef1f5;font-size:12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:600;min-width:150px">parked_checkin_min</span><span style="color:#566070">integer · 15</span></div>
+<div style="display:flex;gap:8px;padding:5px 12px;border-top:1px solid #eef1f5;font-size:12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:600;min-width:150px">parked_gray_min</span><span style="color:#566070">integer · 30</span></div>
+<div style="display:flex;gap:8px;padding:5px 12px;border-top:1px solid #eef1f5;font-size:12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:600;min-width:150px">moving_late_min</span><span style="color:#566070">integer · 2</span></div>
+<div style="display:flex;gap:8px;padding:5px 12px;border-top:1px solid #eef1f5;font-size:12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:600;min-width:150px">moving_gray_min</span><span style="color:#566070">integer · 10</span></div>
+</section>
+
+<section style="flex:1 1 320px;min-width:0;background:#ffffff;border:1px solid #cfd5de;border-radius:10px;overflow:hidden">
+<div style="display:flex;align-items:center;gap:8px;padding:10px 12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:700;font-size:14px">units</span><span style="font-size:11px;background:#dfe9fb;color:#173f8f;border-radius:4px;padding:2px 6px">Setup</span></div>
+<div style="display:flex;gap:8px;padding:5px 12px;border-top:1px solid #eef1f5;font-size:12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:600;min-width:130px">id</span><span style="color:#566070">uuid · primary key</span></div>
+<div style="display:flex;gap:8px;padding:5px 12px;border-top:1px solid #eef1f5;font-size:12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:600;min-width:130px">site_id</span><span style="color:#566070">uuid · links to sites</span></div>
+<div style="display:flex;gap:8px;padding:5px 12px;border-top:1px solid #eef1f5;font-size:12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:600;min-width:130px">name</span><span style="color:#566070">text · shown on the map</span></div>
+<div style="display:flex;gap:8px;padding:5px 12px;border-top:1px solid #eef1f5;font-size:12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:600;min-width:130px">node_public_key</span><span style="color:#566070">text · ties radio reports to this unit</span></div>
+<div style="display:flex;gap:8px;padding:5px 12px;border-top:1px solid #eef1f5;font-size:12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:600;min-width:130px">notes</span><span style="color:#566070">text</span></div>
+</section>
+
+<section style="flex:1 1 320px;min-width:0;background:#ffffff;border:1px solid #cfd5de;border-radius:10px;overflow:hidden">
+<div style="display:flex;align-items:center;gap:8px;padding:10px 12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:700;font-size:14px">repeaters</span><span style="font-size:11px;background:#dfe9fb;color:#173f8f;border-radius:4px;padding:2px 6px">Setup</span></div>
+<div style="display:flex;gap:8px;padding:5px 12px;border-top:1px solid #eef1f5;font-size:12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:600;min-width:130px">id</span><span style="color:#566070">uuid · primary key</span></div>
+<div style="display:flex;gap:8px;padding:5px 12px;border-top:1px solid #eef1f5;font-size:12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:600;min-width:130px">site_id</span><span style="color:#566070">uuid · links to sites</span></div>
+<div style="display:flex;gap:8px;padding:5px 12px;border-top:1px solid #eef1f5;font-size:12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:600;min-width:130px">name</span><span style="color:#566070">text</span></div>
+<div style="display:flex;gap:8px;padding:5px 12px;border-top:1px solid #eef1f5;font-size:12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:600;min-width:130px">kind</span><span style="color:#566070">repeater or gateway</span></div>
+<div style="display:flex;gap:8px;padding:5px 12px;border-top:1px solid #eef1f5;font-size:12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:600;min-width:130px">node_public_key</span><span style="color:#566070">text</span></div>
+<div style="display:flex;gap:8px;padding:5px 12px;border-top:1px solid #eef1f5;font-size:12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:600;min-width:130px">lat, lon</span><span style="color:#566070">where command placed it on the map</span></div>
+</section>
+
+<section style="flex:1 1 320px;min-width:0;background:#ffffff;border:1px solid #cfd5de;border-radius:10px;overflow:hidden">
+<div style="display:flex;align-items:center;gap:8px;padding:10px 12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:700;font-size:14px">positions</span><span style="font-size:11px;background:#d9f0f5;color:#0b4a5c;border-radius:4px;padding:2px 6px">Live</span></div>
+<div style="display:flex;gap:8px;padding:5px 12px;border-top:1px solid #eef1f5;font-size:12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:600;min-width:120px">id</span><span style="color:#566070">bigint · primary key</span></div>
+<div style="display:flex;gap:8px;padding:5px 12px;border-top:1px solid #eef1f5;font-size:12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:600;min-width:120px">unit_id</span><span style="color:#566070">uuid · links to units</span></div>
+<div style="display:flex;gap:8px;padding:5px 12px;border-top:1px solid #eef1f5;font-size:12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:600;min-width:120px">lat, lon</span><span style="color:#566070">decimal degrees</span></div>
+<div style="display:flex;gap:8px;padding:5px 12px;border-top:1px solid #eef1f5;font-size:12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:600;min-width:120px">moving</span><span style="color:#566070">boolean · as reported</span></div>
+<div style="display:flex;gap:8px;padding:5px 12px;border-top:1px solid #eef1f5;font-size:12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:600;min-width:120px">speed_mph</span><span style="color:#566070">number, optional</span></div>
+<div style="display:flex;gap:8px;padding:5px 12px;border-top:1px solid #eef1f5;font-size:12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:600;min-width:120px">received_at</span><span style="color:#566070">server time · used to judge staleness</span></div>
+<div style="display:flex;gap:8px;padding:5px 12px;border-top:1px solid #eef1f5;font-size:12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:600;min-width:120px">source</span><span style="color:#566070">advert or poll reply</span></div>
+</section>
+
+<section style="flex:1 1 320px;min-width:0;background:#ffffff;border:1px solid #cfd5de;border-radius:10px;overflow:hidden">
+<div style="display:flex;align-items:center;gap:8px;padding:10px 12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:700;font-size:14px">repeater_checkins</span><span style="font-size:11px;background:#d9f0f5;color:#0b4a5c;border-radius:4px;padding:2px 6px">Live</span></div>
+<div style="display:flex;gap:8px;padding:5px 12px;border-top:1px solid #eef1f5;font-size:12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:600;min-width:120px">id</span><span style="color:#566070">bigint · primary key</span></div>
+<div style="display:flex;gap:8px;padding:5px 12px;border-top:1px solid #eef1f5;font-size:12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:600;min-width:120px">repeater_id</span><span style="color:#566070">uuid · links to repeaters</span></div>
+<div style="display:flex;gap:8px;padding:5px 12px;border-top:1px solid #eef1f5;font-size:12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:600;min-width:120px">received_at</span><span style="color:#566070">server time</span></div>
+<div style="display:flex;gap:8px;padding:5px 12px;border-top:1px solid #eef1f5;font-size:12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:600;min-width:120px">battery_pct</span><span style="color:#566070">integer, if the node reports it</span></div>
+<div style="display:flex;gap:8px;padding:5px 12px;border-top:1px solid #eef1f5;font-size:12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:600;min-width:120px">snr</span><span style="color:#566070">number, optional</span></div>
+</section>
+
+<section style="flex:1 1 320px;min-width:0;background:#ffffff;border:1px solid #cfd5de;border-radius:10px;overflow:hidden">
+<div style="display:flex;align-items:center;gap:8px;padding:10px 12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:700;font-size:14px">incidents</span><span style="font-size:11px;background:#ede4f8;color:#46257f;border-radius:4px;padding:2px 6px">Operations</span></div>
+<div style="display:flex;gap:8px;padding:5px 12px;border-top:1px solid #eef1f5;font-size:12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:600;min-width:120px">id</span><span style="color:#566070">uuid · primary key</span></div>
+<div style="display:flex;gap:8px;padding:5px 12px;border-top:1px solid #eef1f5;font-size:12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:600;min-width:120px">site_id</span><span style="color:#566070">uuid · links to sites</span></div>
+<div style="display:flex;gap:8px;padding:5px 12px;border-top:1px solid #eef1f5;font-size:12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:600;min-width:120px">label</span><span style="color:#566070">text · Incident 12</span></div>
+<div style="display:flex;gap:8px;padding:5px 12px;border-top:1px solid #eef1f5;font-size:12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:600;min-width:120px">lat, lon</span><span style="color:#566070">where command clicked</span></div>
+<div style="display:flex;gap:8px;padding:5px 12px;border-top:1px solid #eef1f5;font-size:12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:600;min-width:120px">opened_by</span><span style="color:#566070">dispatcher</span></div>
+<div style="display:flex;gap:8px;padding:5px 12px;border-top:1px solid #eef1f5;font-size:12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:600;min-width:120px">opened_at</span><span style="color:#566070">timestamp</span></div>
+<div style="display:flex;gap:8px;padding:5px 12px;border-top:1px solid #eef1f5;font-size:12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:600;min-width:120px">closed_at</span><span style="color:#566070">timestamp, empty while open</span></div>
+</section>
+
+<section style="flex:1 1 320px;min-width:0;background:#ffffff;border:1px solid #cfd5de;border-radius:10px;overflow:hidden">
+<div style="display:flex;align-items:center;gap:8px;padding:10px 12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:700;font-size:14px">assignments</span><span style="font-size:11px;background:#ede4f8;color:#46257f;border-radius:4px;padding:2px 6px">Operations</span></div>
+<div style="display:flex;gap:8px;padding:5px 12px;border-top:1px solid #eef1f5;font-size:12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:600;min-width:130px">id</span><span style="color:#566070">uuid · primary key</span></div>
+<div style="display:flex;gap:8px;padding:5px 12px;border-top:1px solid #eef1f5;font-size:12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:600;min-width:130px">incident_id</span><span style="color:#566070">uuid · links to incidents</span></div>
+<div style="display:flex;gap:8px;padding:5px 12px;border-top:1px solid #eef1f5;font-size:12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:600;min-width:130px">unit_id</span><span style="color:#566070">uuid · links to units</span></div>
+<div style="display:flex;gap:8px;padding:5px 12px;border-top:1px solid #eef1f5;font-size:12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:600;min-width:130px">dispatched_by</span><span style="color:#566070">dispatcher</span></div>
+<div style="display:flex;gap:8px;padding:5px 12px;border-top:1px solid #eef1f5;font-size:12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:600;min-width:130px">dispatched_at</span><span style="color:#566070">timestamp</span></div>
+<div style="display:flex;gap:8px;padding:5px 12px;border-top:1px solid #eef1f5;font-size:12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:600;min-width:130px">on_scene_at</span><span style="color:#566070">timestamp, optional</span></div>
+<div style="display:flex;gap:8px;padding:5px 12px;border-top:1px solid #eef1f5;font-size:12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:600;min-width:130px">cleared_at</span><span style="color:#566070">timestamp, optional</span></div>
+</section>
+
+<section style="flex:1 1 320px;min-width:0;background:#ffffff;border:1px solid #cfd5de;border-radius:10px;overflow:hidden">
+<div style="display:flex;align-items:center;gap:8px;padding:10px 12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:700;font-size:14px">unit_status</span><span style="font-size:11px;background:#ede4f8;color:#46257f;border-radius:4px;padding:2px 6px">Operations</span></div>
+<div style="display:flex;gap:8px;padding:5px 12px;border-top:1px solid #eef1f5;font-size:12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:600;min-width:100px">unit_id</span><span style="color:#566070">uuid · primary key, one row per unit</span></div>
+<div style="display:flex;gap:8px;padding:5px 12px;border-top:1px solid #eef1f5;font-size:12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:600;min-width:100px">status</span><span style="color:#566070">available, dispatched, on_scene, busy, off_duty</span></div>
+<div style="display:flex;gap:8px;padding:5px 12px;border-top:1px solid #eef1f5;font-size:12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:600;min-width:100px">incident_id</span><span style="color:#566070">uuid, empty unless assigned</span></div>
+<div style="display:flex;gap:8px;padding:5px 12px;border-top:1px solid #eef1f5;font-size:12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:600;min-width:100px">set_by</span><span style="color:#566070">dispatcher</span></div>
+<div style="display:flex;gap:8px;padding:5px 12px;border-top:1px solid #eef1f5;font-size:12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:600;min-width:100px">set_at</span><span style="color:#566070">timestamp</span></div>
+</section>
+
+<section style="flex:1 1 320px;min-width:0;background:#ffffff;border:1px solid #cfd5de;border-radius:10px;overflow:hidden">
+<div style="display:flex;align-items:center;gap:8px;padding:10px 12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:700;font-size:14px">status_log</span><span style="font-size:11px;background:#ede4f8;color:#46257f;border-radius:4px;padding:2px 6px">Operations</span></div>
+<div style="display:flex;gap:8px;padding:5px 12px;border-top:1px solid #eef1f5;font-size:12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:600;min-width:110px">id</span><span style="color:#566070">bigint · append only</span></div>
+<div style="display:flex;gap:8px;padding:5px 12px;border-top:1px solid #eef1f5;font-size:12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:600;min-width:110px">unit_id</span><span style="color:#566070">uuid · links to units</span></div>
+<div style="display:flex;gap:8px;padding:5px 12px;border-top:1px solid #eef1f5;font-size:12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:600;min-width:110px">from, to</span><span style="color:#566070">status before and after</span></div>
+<div style="display:flex;gap:8px;padding:5px 12px;border-top:1px solid #eef1f5;font-size:12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:600;min-width:110px">incident_id</span><span style="color:#566070">uuid, optional</span></div>
+<div style="display:flex;gap:8px;padding:5px 12px;border-top:1px solid #eef1f5;font-size:12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:600;min-width:110px">set_by, set_at</span><span style="color:#566070">who and when</span></div>
+<div style="display:flex;gap:8px;padding:5px 12px;border-top:1px solid #eef1f5;font-size:12px"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:600;min-width:110px">note</span><span style="color:#566070">text, optional</span></div>
+</section>
+
+<section style="flex:1 1 320px;min-width:0;background:#fff8e8;border:1px solid #e0b866;border-radius:10px;overflow:hidden">
+<div style="padding:10px 12px;font-weight:700;font-size:14px">Computed, not stored</div>
+<div style="padding:6px 12px 12px;font-size:12px;line-height:18px;color:#2b323c">
+<p style="margin:0 0 8px"><b>Unit contact state</b> (normal, late, no contact) comes from the newest positions.received_at, the moving flag and site_rules.</p>
+<p style="margin:0 0 8px"><b>Repeater status</b> (online, degraded, offline) comes from the newest repeater_checkins.received_at.</p>
+<p style="margin:0"><b>Nearest units</b> are ranked by distance to the incident, counting only units that are available and not in no contact.</p>
+</div>
+</section>
+
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1100}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

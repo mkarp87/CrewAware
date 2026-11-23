@@ -1,0 +1,499 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Command view</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+body{margin:0;font-family:Inter,system-ui,sans-serif;color:#14181f;background:#eef1f5}
+button,select,input{font-family:inherit}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid #1d5fd1;outline-offset:2px}
+</style>
+</helmet>
+<div style="min-height:1040px;display:flex;flex-direction:column;background:#eef1f5">
+
+<header style="background:#14181f;color:#ffffff;display:flex;flex-wrap:wrap;align-items:center;gap:16px;padding:12px 24px">
+<div style="height:36px;min-width:96px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;border:1px dashed #8b93a1;border-radius:6px;font-size:12px;color:#c9d0da;padding:0 8px">Your logo</div>
+<div style="display:flex;flex-direction:column"><div style="font-weight:700;font-size:18px;line-height:22px">CrewAware</div><div style="font-size:12px;line-height:16px;color:#c9d0da">Your slogan here</div></div>
+<label style="display:flex;align-items:center;gap:8px;font-size:13px">Site
+<select value="{{site}}" onChange="{{onSite}}" style="font-size:14px;padding:6px 8px;border-radius:6px;border:1px solid #566070;background:#ffffff;color:#14181f">
+<option value="airshow">Airshow grounds</option>
+<option value="hangar">Hangar row (no overlay yet)</option>
+</select>
+</label>
+<div style="display:flex;align-items:center;gap:8px;font-size:13px;background:#23303a;border-radius:999px;padding:6px 12px"><span style="width:8px;height:8px;border-radius:50%;background:#4ade80"></span>Gateway: USB companion, connected</div>
+<div style="margin-left:auto;display:flex;flex-wrap:wrap;gap:8px;font-size:13px">
+<span style="background:#e3f4ec;color:#0f5a40;border-radius:6px;padding:6px 10px;font-weight:600">{{availCount}} available</span>
+<span style="background:#dfe9fb;color:#173f8f;border-radius:6px;padding:6px 10px;font-weight:600">{{deployedCount}} dispatched or on scene</span>
+<span style="background:#e3e6eb;color:#2b323c;border-radius:6px;padding:6px 10px;font-weight:600">{{noContactCount}} no contact</span>
+<span style="background:#ffe9c7;color:#6b3a00;border-radius:6px;padding:6px 10px;font-weight:600">{{repsDownCount}} repeater issues</span>
+</div>
+</header>
+
+<div style="display:flex;flex-wrap:wrap;gap:16px;padding:16px 24px;align-items:flex-start">
+
+<main style="flex:999 1 560px;min-width:0;display:flex;flex-direction:column;gap:12px">
+<div style="display:flex;flex-wrap:wrap;align-items:center;gap:16px;font-size:13px">
+<label style="display:flex;align-items:center;gap:6px"><input type="checkbox" checked="{{overlayChecked}}" disabled="{{overlayDisabled}}" onChange="{{toggleOverlay}}">Site overlay</label>
+<label style="display:flex;align-items:center;gap:6px"><input type="range" min="20" max="100" value="{{opacityPct}}" onChange="{{onOpacity}}">Overlay opacity</label>
+<label style="display:flex;align-items:center;gap:6px"><input type="checkbox" checked="{{showReps}}" onChange="{{toggleReps}}">Repeaters</label>
+<span style="margin-left:auto;color:#566070">Click the map to place an incident</span>
+</div>
+
+<div style="position:relative;width:100%;aspect-ratio:1095/495;border:1px solid #b9c1cc;border-radius:10px;overflow:hidden;background-color:#dfe5ec;background-image:linear-gradient(#cdd5df 1px,transparent 1px),linear-gradient(90deg,#cdd5df 1px,transparent 1px);background-size:48px 48px">
+<sc-if value="{{overlayOn}}" hint-placeholder-val="{{ true }}">
+<img src="/_blob/8fc8237603b9100aa2440e4ef4bb37ae" alt="Site overlay: airshow grounds with zones 1 to 6, Air Command, vendors, fuel farm and hangars" style="position:absolute;left:0;top:0;width:100%;height:100%;opacity:{{opacity}}">
+</sc-if>
+<svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true" style="position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none">
+<sc-for list="{{lines}}" as="l" hint-placeholder-count="2">
+<line x1="{{l.x1}}" y1="{{l.y1}}" x2="{{l.x2}}" y2="{{l.y2}}" stroke="{{l.stroke}}" stroke-width="{{l.w}}" stroke-dasharray="{{l.dash}}" vector-effect="non-scaling-stroke"></line>
+</sc-for>
+</svg>
+<button onClick="{{mapClick}}" aria-label="Map. Activate to place an incident at the pointer, or at the map centre from the keyboard" style="position:absolute;left:0;top:0;width:100%;height:100%;padding:0;border:0;background:transparent;cursor:crosshair"></button>
+
+<sc-for list="{{incidents}}" as="i" hint-placeholder-count="1">
+<div style="position:absolute;left:{{i.x}}%;top:{{i.y}}%;width:0;height:0;pointer-events:none">
+<div style="position:absolute;left:-14px;top:-14px;width:28px;height:28px;box-sizing:border-box;border-radius:50%;border:4px solid #b42318;background:rgba(255,255,255,0.75)"></div>
+<div style="position:absolute;left:-4px;top:-4px;width:8px;height:8px;border-radius:50%;background:#b42318"></div>
+<div style="position:absolute;left:18px;top:-10px;background:#b42318;color:#ffffff;font-size:11px;font-weight:700;padding:2px 6px;border-radius:4px;white-space:nowrap">{{i.label}}</div>
+</div>
+</sc-for>
+<sc-if value="{{hasDraft}}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;left:{{draftX}}%;top:{{draftY}}%;width:0;height:0;pointer-events:none">
+<div style="position:absolute;left:-16px;top:-16px;width:32px;height:32px;box-sizing:border-box;border-radius:50%;border:4px dashed #b42318;background:rgba(255,255,255,0.8)"></div>
+<div style="position:absolute;left:-4px;top:-4px;width:8px;height:8px;border-radius:50%;background:#b42318"></div>
+<div style="position:absolute;left:20px;top:-10px;background:#ffffff;color:#b42318;border:1px solid #b42318;font-size:11px;font-weight:700;padding:2px 6px;border-radius:4px;white-space:nowrap">{{draftLabel}}</div>
+</div>
+</sc-if>
+
+<sc-if value="{{showReps}}" hint-placeholder-val="{{ true }}">
+<sc-for list="{{repMarkers}}" as="r" hint-placeholder-count="3">
+<button onClick="{{r.select}}" aria-label="{{r.aria}}" style="{{r.style}}"><span style="{{r.innerStyle}}">{{r.code}}</span></button>
+</sc-for>
+</sc-if>
+
+<sc-for list="{{unitMarkers}}" as="u" hint-placeholder-count="7">
+<button onClick="{{u.select}}" aria-label="{{u.aria}}" style="position:absolute;left:{{u.x}}%;top:{{u.y}}%;width:34px;height:34px;margin:-17px 0 0 -17px;padding:0;box-sizing:border-box;border-radius:50%;background:{{u.bg}};color:{{u.fg}};border:{{u.ring}};opacity:{{u.opacity}};outline:{{u.outline}};outline-offset:2px;font-size:14px;font-weight:700;box-shadow:0 1px 3px rgba(0,0,0,0.5);cursor:pointer">{{u.id}}<span style="position:absolute;right:-8px;top:-8px;width:16px;height:16px;border-radius:50%;background:#ffffff;color:#14181f;border:1px solid #14181f;font-size:10px;line-height:14px;font-weight:700;text-align:center">{{u.code}}</span></button>
+</sc-for>
+
+<sc-if value="{{placing}}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;left:12px;top:12px;background:#0e7490;color:#ffffff;font-size:13px;font-weight:600;padding:8px 12px;border-radius:6px">Click the map to place the new repeater</div>
+</sc-if>
+<sc-if value="{{noOverlayNote}}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;right:12px;bottom:12px;background:#ffffff;border:1px solid #b9c1cc;font-size:12px;color:#2b323c;padding:6px 10px;border-radius:6px">No overlay uploaded for this site. Basemap grid only.</div>
+</sc-if>
+</div>
+
+<div style="background:#ffffff;border:1px solid #cfd5de;border-radius:10px;padding:12px 16px;display:flex;flex-wrap:wrap;gap:16px;align-items:center;font-size:12px;color:#2b323c">
+<div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;flex:1 1 420px">
+<span style="display:flex;align-items:center;gap:6px"><span style="width:14px;height:14px;border-radius:50%;background:#1b7f5c"></span>Available</span>
+<span style="display:flex;align-items:center;gap:6px"><span style="width:14px;height:14px;border-radius:50%;background:#1d5fd1"></span>Dispatched</span>
+<span style="display:flex;align-items:center;gap:6px"><span style="width:14px;height:14px;border-radius:50%;background:#6b3fb5"></span>On scene</span>
+<span style="display:flex;align-items:center;gap:6px"><span style="width:14px;height:14px;border-radius:50%;background:#f0a020"></span>Busy</span>
+<span style="display:flex;align-items:center;gap:6px"><span style="width:14px;height:14px;border-radius:50%;background:#3b4350"></span>Off duty</span>
+<span style="display:flex;align-items:center;gap:6px"><span style="width:14px;height:14px;border-radius:50%;background:#1b7f5c;border:3px dashed #ffb02e;box-sizing:border-box"></span>Late check-in</span>
+<span style="display:flex;align-items:center;gap:6px"><span style="width:14px;height:14px;border-radius:50%;background:#1b7f5c;opacity:0.5;border:2px dashed #14181f;box-sizing:border-box"></span>No contact</span>
+<span style="display:flex;align-items:center;gap:6px"><span style="width:12px;height:12px;background:#0e7490;transform:rotate(45deg)"></span>Repeater online</span>
+<span style="display:flex;align-items:center;gap:6px"><span style="width:12px;height:12px;background:#a85600;transform:rotate(45deg)"></span>Degraded</span>
+<span style="display:flex;align-items:center;gap:6px"><span style="width:12px;height:12px;background:#ffffff;border:2px dashed #3b4350;box-sizing:border-box;transform:rotate(45deg)"></span>Offline</span>
+</div>
+<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+<span style="font-weight:600">Demo clock +{{tOff}} min</span>
+<button onClick="{{ff3}}" style="font-size:12px;padding:6px 10px;border-radius:6px;border:1px solid #566070;background:#ffffff;color:#14181f;cursor:pointer">+3 min</button>
+<button onClick="{{ff10}}" style="font-size:12px;padding:6px 10px;border-radius:6px;border:1px solid #566070;background:#ffffff;color:#14181f;cursor:pointer">+10 min</button>
+<button onClick="{{ff0}}" style="font-size:12px;padding:6px 10px;border-radius:6px;border:1px solid #566070;background:#ffffff;color:#14181f;cursor:pointer">Reset</button>
+</div>
+<div style="flex:1 1 100%;color:#566070">Sample data. Distances use a demo scale of about 3,000 ft across the map, and ETAs assume a 10 mph max speed. The real app uses georeferenced coordinates and each vehicle group's max speed.</div>
+</div>
+
+<section style="background:#ffffff;border:1px solid #cfd5de;border-radius:10px;overflow:hidden">
+<div style="padding:10px 16px;font-weight:600;font-size:14px;border-bottom:1px solid #e3e7ed">Activity log</div>
+<sc-for list="{{log}}" as="l" hint-placeholder-count="3">
+<div style="display:flex;gap:12px;padding:8px 16px;font-size:13px;border-bottom:1px solid #eef1f5"><span style="color:#566070;min-width:56px">T+{{l.w}} min</span><span>{{l.t}}</span></div>
+</sc-for>
+</section>
+</main>
+
+<aside style="flex:1 1 380px;max-width:440px;min-width:0;display:flex;flex-direction:column;gap:12px">
+<div role="tablist" style="display:flex;gap:4px;background:#dde2ea;padding:4px;border-radius:10px">
+<button role="tab" aria-selected="{{unitsTab}}" onClick="{{showUnits}}" style="flex:1;min-height:44px;border:0;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;background:{{unitsTabBg}};color:#14181f">Units ({{unitCount}})</button>
+<button role="tab" aria-selected="{{repsTab}}" onClick="{{showRepsTab}}" style="flex:1;min-height:44px;border:0;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;background:{{repsTabBg}};color:#14181f">Repeaters ({{repCount}})</button>
+</div>
+
+<sc-if value="{{unitsTab}}" hint-placeholder-val="{{ true }}">
+<sc-if value="{{hasDraft}}" hint-placeholder-val="{{ false }}">
+<section style="background:#ffffff;border:1px solid #cfd5de;border-radius:10px;overflow:hidden">
+<div style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid #e3e7ed">
+<div style="flex:1;font-weight:700;font-size:14px">{{draftLabel}} <span style="font-weight:400;color:#566070;font-size:12px">{{draftCoords}}</span></div>
+<button onClick="{{clearDraft}}" style="min-height:36px;padding:0 12px;border-radius:6px;border:1px solid #566070;background:#ffffff;color:#14181f;font-size:13px;cursor:pointer">Clear</button>
+</div>
+<div style="padding:8px 12px;font-size:12px;color:#566070">Nearest available units, straight-line distance</div>
+<sc-if value="{{noneEligible}}" hint-placeholder-val="{{ false }}">
+<div style="padding:8px 12px 12px;font-size:13px">No available unit with a recent position. Check the units below.</div>
+</sc-if>
+<sc-for list="{{nearest}}" as="n" hint-placeholder-count="3">
+<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-top:1px solid #eef1f5">
+<div style="width:20px;font-weight:700;color:#566070">{{n.rank}}</div>
+<div style="flex:1;min-width:0">
+<div style="font-weight:600;font-size:14px">{{n.name}}
+<sc-if value="{{n.isLate}}"><span style="font-size:11px;background:#fff1d6;color:#7a4300;border-radius:4px;padding:2px 6px;margin-left:6px">Late check-in</span></sc-if>
+</div>
+<div style="font-size:12px;color:#566070">{{n.dist}} · ETA {{n.eta}} · {{n.sub}}</div>
+</div>
+<sc-if value="{{n.notConfirming}}"><button onClick="{{n.ask}}" style="min-height:44px;padding:0 14px;border-radius:8px;border:0;background:#1d5fd1;color:#ffffff;font-size:13px;font-weight:600;cursor:pointer">Dispatch</button></sc-if>
+<sc-if value="{{n.confirming}}">
+<button onClick="{{n.go}}" style="min-height:44px;padding:0 12px;border-radius:8px;border:0;background:#14181f;color:#ffffff;font-size:13px;font-weight:600;cursor:pointer">Confirm</button>
+<button onClick="{{n.cancel}}" style="min-height:44px;padding:0 10px;border-radius:8px;border:1px solid #566070;background:#ffffff;color:#14181f;font-size:13px;cursor:pointer">Cancel</button>
+</sc-if>
+</div>
+</sc-for>
+<sc-if value="{{hasExcluded}}" hint-placeholder-val="{{ true }}">
+<div style="padding:8px 12px;font-size:12px;color:#566070;background:#f6f8fa;border-top:1px solid #e3e7ed">Not suggested</div>
+<sc-for list="{{excluded}}" as="x" hint-placeholder-count="2">
+<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-top:1px solid #eef1f5;background:#f6f8fa">
+<div style="flex:1;min-width:0">
+<div style="font-weight:600;font-size:13px;color:#566070">{{x.name}} <span style="font-weight:400">· {{x.dist}}</span></div>
+<div style="font-size:12px;color:#566070">{{x.reason}}</div>
+</div>
+<sc-if value="{{x.canOverride}}"><button onClick="{{x.ask}}" style="min-height:36px;padding:0 10px;border-radius:6px;border:1px solid #566070;background:#ffffff;color:#14181f;font-size:12px;cursor:pointer">Override</button></sc-if>
+</div>
+</sc-for>
+</sc-if>
+</section>
+</sc-if>
+
+<sc-if value="{{noDraft}}" hint-placeholder-val="{{ true }}">
+<section style="background:#ffffff;border:1px dashed #8b93a1;border-radius:10px;padding:14px 16px;font-size:13px;color:#2b323c">Click the map to place an incident. The nearest available units appear here, ranked by distance.</section>
+</sc-if>
+
+<section style="background:#ffffff;border:1px solid #cfd5de;border-radius:10px;overflow:hidden">
+<div style="padding:10px 12px;font-weight:700;font-size:14px;border-bottom:1px solid #e3e7ed">All units</div>
+<sc-for list="{{unitRows}}" as="u" hint-placeholder-count="7">
+<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid #eef1f5;background:{{u.rowBg}}">
+<button onClick="{{u.select}}" aria-label="Locate {{u.name}} on the map" style="width:32px;height:32px;flex:none;border-radius:50%;border:0;background:{{u.bg}};color:{{u.fg}};font-size:13px;font-weight:700;cursor:pointer">{{u.id}}</button>
+<div style="flex:1;min-width:0">
+<div style="font-weight:600;font-size:14px">{{u.name}}
+<sc-if value="{{u.isLate}}"><span style="font-size:11px;background:#fff1d6;color:#7a4300;border-radius:4px;padding:2px 6px;margin-left:4px">Late</span></sc-if>
+<sc-if value="{{u.isGray}}"><span style="font-size:11px;background:#e3e6eb;color:#2b323c;border-radius:4px;padding:2px 6px;margin-left:4px">No contact</span></sc-if>
+</div>
+<div style="font-size:12px;color:#566070">{{u.sub}}</div>
+</div>
+<sc-if value="{{u.canArrive}}"><button onClick="{{u.arrive}}" style="min-height:36px;padding:0 8px;border-radius:6px;border:1px solid #566070;background:#ffffff;color:#14181f;font-size:12px;cursor:pointer">On scene</button></sc-if>
+<sc-if value="{{u.canClear}}"><button onClick="{{u.clear}}" style="min-height:36px;padding:0 8px;border-radius:6px;border:1px solid #566070;background:#ffffff;color:#14181f;font-size:12px;cursor:pointer">Clear</button></sc-if>
+<select aria-label="Status for {{u.name}}" value="{{u.status}}" onChange="{{u.onStatus}}" style="min-height:36px;font-size:12px;padding:0 4px;border-radius:6px;border:1px solid #566070;background:#ffffff;color:#14181f">
+<option value="available">Available</option>
+<option value="dispatched">Dispatched</option>
+<option value="onscene">On scene</option>
+<option value="busy">Busy</option>
+<option value="off">Off duty</option>
+</select>
+</div>
+</sc-for>
+</section>
+</sc-if>
+
+<sc-if value="{{repsTab}}" hint-placeholder-val="{{ false }}">
+<section style="background:#ffffff;border:1px solid #cfd5de;border-radius:10px;overflow:hidden">
+<div style="padding:10px 12px;font-weight:700;font-size:14px;border-bottom:1px solid #e3e7ed">Repeaters and gateway</div>
+<sc-for list="{{repRows}}" as="r" hint-placeholder-count="5">
+<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid #eef1f5;background:{{r.rowBg}}">
+<div style="width:32px;height:32px;flex:none;display:flex;align-items:center;justify-content:center"><div style="{{r.iconStyle}}"></div></div>
+<div style="flex:1;min-width:0">
+<div style="font-weight:600;font-size:14px">{{r.name}}</div>
+<div style="font-size:12px;color:#566070">{{r.sub}}</div>
+</div>
+<span style="font-size:12px;font-weight:600;border-radius:4px;padding:3px 8px;background:{{r.chipBg}};color:{{r.chipFg}}">{{r.statusLabel}}</span>
+</div>
+</sc-for>
+<div style="padding:12px;display:flex;flex-direction:column;gap:8px">
+<button onClick="{{togglePlacing}}" style="min-height:44px;border-radius:8px;border:0;background:{{placeBtnBg}};color:#ffffff;font-size:14px;font-weight:600;cursor:pointer">{{placeBtnText}}</button>
+<div style="font-size:12px;color:#566070">A new repeater starts as Not heard yet. It turns Online after its first check-in reaches the gateway.</div>
+</div>
+</section>
+</sc-if>
+</aside>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"heartbeat":{"editor":"int","default":15,"min":5,"max":30,"step":1,"unit":"min","section":"Check-in rules"},"grayAfter":{"editor":"int","default":30,"min":10,"max":120,"step":5,"unit":"min","section":"Check-in rules"},"$preview":{"width":1440,"height":1040}}'>
+class Component extends DCLogic {
+  STATUS = {
+    available: { label: 'Available', bg: '#1b7f5c', fg: '#ffffff', code: 'A' },
+    dispatched: { label: 'Dispatched', bg: '#1d5fd1', fg: '#ffffff', code: 'D' },
+    onscene: { label: 'On scene', bg: '#6b3fb5', fg: '#ffffff', code: 'S' },
+    busy: { label: 'Busy', bg: '#f0a020', fg: '#14181f', code: 'B' },
+    off: { label: 'Off duty', bg: '#3b4350', fg: '#ffffff', code: 'O' }
+  };
+
+  UNITS = [
+    { id: 1, name: 'UTV 1', x: 14, y: 46, moving: false, speed: 0, age: 240, silent: false },
+    { id: 2, name: 'UTV 2', x: 34, y: 34, moving: true, speed: 9, age: 20, silent: false },
+    { id: 3, name: 'UTV 3', x: 50, y: 56, moving: false, speed: 0, age: 540, silent: false },
+    { id: 4, name: 'UTV 4', x: 70, y: 48, moving: false, speed: 0, age: 360, silent: true },
+    { id: 5, name: 'UTV 5', x: 82, y: 42, moving: true, speed: 6, age: 35, silent: true },
+    { id: 6, name: 'UTV 6', x: 24, y: 78, moving: false, speed: 0, age: 720, silent: false },
+    { id: 7, name: 'UTV 7', x: 78, y: 18, moving: true, speed: 11, age: 15, silent: false }
+  ];
+
+  REPS = [
+    { id: 'GW', code: 'GW', name: 'Gateway', kind: 'gateway', x: 64, y: 60, age: 0, silent: false, battery: 'Mains' },
+    { id: 'R1', code: 'R1', name: 'Repeater 1, hangar roof', kind: 'repeater', x: 46, y: 62, age: 120, silent: false, battery: '96%' },
+    { id: 'R2', code: 'R2', name: 'Repeater 2, east gate', kind: 'repeater', x: 95, y: 52, age: 300, silent: false, battery: '82%' },
+    { id: 'R3', code: 'R3', name: 'Repeater 3, fuel farm road', kind: 'repeater', x: 22, y: 64, age: 1080, silent: true, battery: '31%' },
+    { id: 'R4', code: 'R4', name: 'Repeater 4, north ramp', kind: 'repeater', x: 60, y: 8, age: 7200, silent: true, battery: 'Unknown' }
+  ];
+
+  state = {
+    tab: 'units', site: 'airshow', tOff: 0, overlay: true, opacity: 85, showReps: true,
+    draft: null, confirm: null, placing: false, sel: null, nextInc: 12, nextRep: 5,
+    us: {
+      1: { s: 'available', i: null }, 2: { s: 'available', i: null }, 3: { s: 'busy', i: null },
+      4: { s: 'available', i: null }, 5: { s: 'available', i: null }, 6: { s: 'off', i: null },
+      7: { s: 'dispatched', i: 11 }
+    },
+    incs: [{ id: 11, x: 92, y: 32, u: 7 }],
+    newReps: [],
+    log: [{ w: 0, t: 'UTV 7 dispatched to Incident 11' }]
+  };
+
+  pushLog(st, text) {
+    return [{ w: st.tOff, t: text }].concat(st.log).slice(0, 6);
+  }
+
+  renderVals() {
+    const s = this.state;
+    const hb = (this.props.heartbeat ?? 15) * 60;
+    const gr = (this.props.grayAfter ?? 30) * 60;
+    const MX = 9;
+    const MY = 900 * 495 / 1095 / 100;
+    const fmt = (a) => a < 60 ? Math.round(a) + ' s ago' : a < 3600 ? Math.round(a / 60) + ' min ago' : Math.floor(a / 3600) + ' h ' + Math.round((a % 3600) / 60) + ' min ago';
+    const ageOf = (b, moving) => b.silent ? b.age + s.tOff * 60 : (b.age + s.tOff * 60) % (moving ? 45 : hb);
+    const dist = (ax, ay, bx, by) => Math.sqrt(Math.pow((ax - bx) * MX, 2) + Math.pow((ay - by) * MY, 2));
+    const fmtDist = (d) => { const ft = d * 3.28084; return ft < 1000 ? (Math.round(ft / 10) * 10) + ' ft' : (ft / 5280).toFixed(1) + ' mi'; };
+    const fmtEta = (d) => { const sec = d / 4.47; return sec < 60 ? 'under 1 min' : Math.round(sec / 60) + ' min'; };
+
+    const units = this.UNITS.map((b) => {
+      const st = s.us[b.id];
+      const S = this.STATUS[st.s];
+      const age = ageOf(b, b.moving);
+      const contact = b.moving ? (age > 600 ? 'gray' : age > 120 ? 'late' : 'ok') : (age > gr ? 'gray' : age > hb ? 'late' : 'ok');
+      const motion = b.moving ? 'Moving ' + b.speed + ' mph' : 'Parked';
+      let sub = motion + ' · ' + fmt(age);
+      if (st.i) sub = sub + ' · Incident ' + st.i;
+      const eligible = st.s === 'available' && contact !== 'gray';
+      let reason = S.label;
+      if (contact === 'gray') reason = 'No contact, last heard ' + fmt(age);
+      if (st.i && (st.s === 'dispatched' || st.s === 'onscene')) reason = S.label + ' to Incident ' + st.i;
+      return { b, st, S, age, contact, sub, eligible, reason };
+    });
+
+    const lines = [];
+    s.incs.forEach((inc) => {
+      const u = units.find((x) => x.b.id === inc.u);
+      if (u && (u.st.s === 'dispatched' || u.st.s === 'onscene')) {
+        lines.push({ x1: u.b.x, y1: u.b.y, x2: inc.x, y2: inc.y, stroke: '#1d5fd1', w: 3, dash: '8 6' });
+      }
+    });
+
+    let nearest = [];
+    let excluded = [];
+    if (s.draft) {
+      const all = units.map((u) => ({ u, d: dist(u.b.x, u.b.y, s.draft.x, s.draft.y) }));
+      all.sort((a, b) => a.d - b.d);
+      const ask = (id) => () => this.setState({ confirm: id });
+      const dispatch = (u) => () => {
+        this.setState((st) => {
+          const inc = st.nextInc;
+          return {
+            us: Object.assign({}, st.us, { [u.b.id]: { s: 'dispatched', i: inc } }),
+            incs: st.incs.concat([{ id: inc, x: st.draft.x, y: st.draft.y, u: u.b.id }]),
+            nextInc: inc + 1, draft: null, confirm: null,
+            log: this.pushLog(st, u.b.name + ' dispatched to Incident ' + inc)
+          };
+        });
+      };
+      let rank = 0;
+      all.forEach((o) => {
+        const u = o.u;
+        if (u.eligible) {
+          rank += 1;
+          nearest.push({
+            rank: rank, name: u.b.name, dist: fmtDist(o.d), eta: fmtEta(o.d), sub: u.sub,
+            isLate: u.contact === 'late',
+            confirming: s.confirm === u.b.id, notConfirming: s.confirm !== u.b.id,
+            ask: ask(u.b.id), go: dispatch(u), cancel: () => this.setState({ confirm: null })
+          });
+        } else {
+          const canOverride = (u.st.s === 'busy' || u.contact === 'gray') && u.st.s !== 'off';
+          excluded.push({ name: u.b.name, dist: fmtDist(o.d), reason: u.reason, canOverride: canOverride, ask: dispatch(u) });
+        }
+      });
+      nearest = nearest.slice(0, 4);
+      nearest.forEach((n, idx) => {
+        const u = all.filter((o) => o.u.eligible)[idx];
+        if (idx < 3 && u) lines.push({ x1: u.u.b.x, y1: u.u.b.y, x2: s.draft.x, y2: s.draft.y, stroke: 'rgba(20,24,31,0.45)', w: 1.5, dash: '2 5' });
+      });
+    }
+
+    const unitMarkers = units.map((u) => ({
+      id: u.b.id, x: u.b.x, y: u.b.y, bg: u.S.bg, fg: u.S.fg, code: u.S.code,
+      ring: u.contact === 'gray' ? '3px dashed #14181f' : u.contact === 'late' ? '3px dashed #ffb02e' : '3px solid #ffffff',
+      opacity: u.contact === 'gray' ? 0.55 : 1,
+      outline: s.sel === u.b.id ? '3px solid #14181f' : 'none',
+      aria: u.b.name + ', ' + u.S.label + ', ' + u.sub + (u.contact === 'late' ? ', late check-in' : '') + (u.contact === 'gray' ? ', no contact' : ''),
+      select: () => this.setState({ sel: s.sel === u.b.id ? null : u.b.id })
+    }));
+
+    const unitRows = units.map((u) => ({
+      id: u.b.id, name: u.b.name, bg: u.S.bg, fg: u.S.fg, sub: u.sub, status: u.st.s,
+      isLate: u.contact === 'late', isGray: u.contact === 'gray',
+      rowBg: s.sel === u.b.id ? '#eaf0fb' : '#ffffff',
+      canArrive: u.st.s === 'dispatched', canClear: u.st.s === 'onscene',
+      select: () => this.setState({ sel: s.sel === u.b.id ? null : u.b.id }),
+      arrive: () => this.setState((st) => ({ us: Object.assign({}, st.us, { [u.b.id]: { s: 'onscene', i: st.us[u.b.id].i } }), log: this.pushLog(st, u.b.name + ' on scene at Incident ' + st.us[u.b.id].i) })),
+      clear: () => this.setState((st) => ({ us: Object.assign({}, st.us, { [u.b.id]: { s: 'available', i: null } }), incs: st.incs.filter((x) => x.u !== u.b.id), log: this.pushLog(st, u.b.name + ' cleared Incident ' + st.us[u.b.id].i + ', now available') })),
+      onStatus: (e) => {
+        const v = e.target.value;
+        this.setState((st) => ({
+          us: Object.assign({}, st.us, { [u.b.id]: { s: v, i: (v === 'dispatched' || v === 'onscene') ? st.us[u.b.id].i : null } }),
+          incs: (v === 'dispatched' || v === 'onscene') ? st.incs : st.incs.map((x) => x.u === u.b.id ? Object.assign({}, x, { u: null }) : x),
+          log: this.pushLog(st, 'Command set ' + u.b.name + ' to ' + this.STATUS[v].label)
+        }));
+      }
+    }));
+
+    const reps = this.REPS.concat(s.newReps).map((r) => {
+      let status = 'online';
+      let age = 0;
+      if (r.pending) status = 'pending';
+      else if (r.kind !== 'gateway') {
+        age = ageOf(r, false);
+        status = age <= hb ? 'online' : age <= gr ? 'degraded' : 'offline';
+      }
+      const labels = { online: 'Online', degraded: 'Degraded', offline: 'Offline', pending: 'Not heard yet' };
+      const chips = { online: ['#d9f0f5', '#0b4a5c'], degraded: ['#ffe9c7', '#6b3a00'], offline: ['#e3e6eb', '#2b323c'], pending: ['#e8f3f6', '#0b4a5c'] };
+      const heard = r.kind === 'gateway' ? 'USB link up' : r.pending ? 'Waiting for first check-in' : 'Last heard ' + fmt(age);
+      return { r, status, age, label: labels[status], chip: chips[status], heard };
+    });
+
+    const repStyle = (o) => {
+      if (o.r.kind === 'gateway') return { w: 34, h: 24, bg: '#14181f', fg: '#ffffff', border: '2px solid #ffffff', rot: 0, radius: 4 };
+      const map = {
+        online: { bg: '#0e7490', fg: '#ffffff', border: '2px solid #ffffff' },
+        degraded: { bg: '#a85600', fg: '#ffffff', border: '2px dashed #ffffff' },
+        offline: { bg: '#ffffff', fg: '#3b4350', border: '2px dashed #3b4350' },
+        pending: { bg: '#ffffff', fg: '#0e7490', border: '2px dashed #0e7490' }
+      }[o.status];
+      return { w: 26, h: 26, bg: map.bg, fg: map.fg, border: map.border, rot: 45, radius: 3 };
+    };
+
+    const repMarkers = reps.map((o) => {
+      const v = repStyle(o);
+      return {
+        code: o.r.code,
+        style: 'position:absolute;left:' + o.r.x + '%;top:' + o.r.y + '%;width:' + v.w + 'px;height:' + v.h + 'px;margin:-' + (v.h / 2) + 'px 0 0 -' + (v.w / 2) + 'px;padding:0;box-sizing:border-box;border-radius:' + v.radius + 'px;background:' + v.bg + ';border:' + v.border + ';transform:rotate(' + v.rot + 'deg);box-shadow:0 1px 3px rgba(0,0,0,0.5);cursor:pointer',
+        innerStyle: 'display:block;transform:rotate(-' + v.rot + 'deg);font-size:10px;font-weight:700;line-height:1;color:' + v.fg,
+        aria: o.r.name + ', ' + o.label + ', ' + o.heard,
+        select: () => this.setState({ tab: 'repeaters' })
+      };
+    });
+
+    const repRows = reps.map((o) => {
+      const v = repStyle(o);
+      return {
+        name: o.r.name, statusLabel: o.label, chipBg: o.chip[0], chipFg: o.chip[1],
+        sub: (o.r.kind === 'gateway' ? 'Companion node on USB' : 'Battery ' + o.r.battery) + ' · ' + o.heard,
+        rowBg: '#ffffff',
+        iconStyle: 'width:' + (o.r.kind === 'gateway' ? 26 : 18) + 'px;height:' + (o.r.kind === 'gateway' ? 18 : 18) + 'px;box-sizing:border-box;background:' + v.bg + ';border:' + v.border + ';transform:rotate(' + v.rot + 'deg);border-radius:' + v.radius + 'px'
+      };
+    });
+
+    const incidents = s.incs.map((i) => ({ x: i.x, y: i.y, label: 'Inc ' + i.id }));
+
+    const cnt = (f) => units.filter(f).length;
+    const deployed = cnt((u) => u.st.s === 'dispatched' || u.st.s === 'onscene');
+    const unitsTab = s.tab === 'units';
+
+    return {
+      site: s.site,
+      onSite: (e) => this.setState({ site: e.target.value }),
+      availCount: cnt((u) => u.st.s === 'available'),
+      deployedCount: deployed,
+      noContactCount: cnt((u) => u.contact === 'gray'),
+      repsDownCount: reps.filter((o) => o.status === 'degraded' || o.status === 'offline').length,
+      overlayChecked: s.overlay && s.site === 'airshow',
+      overlayDisabled: s.site !== 'airshow',
+      overlayOn: s.overlay && s.site === 'airshow',
+      noOverlayNote: s.site !== 'airshow',
+      toggleOverlay: () => this.setState({ overlay: !s.overlay }),
+      opacityPct: s.opacity,
+      opacity: s.opacity / 100,
+      onOpacity: (e) => this.setState({ opacity: parseInt(e.target.value, 10) }),
+      showReps: s.showReps,
+      toggleReps: () => this.setState({ showReps: !s.showReps }),
+      lines: lines,
+      mapClick: (e) => {
+        const r = e.currentTarget.getBoundingClientRect();
+        const kb = e.detail === 0;
+        let x = kb ? 50 : (e.clientX - r.left) / r.width * 100;
+        let y = kb ? 50 : (e.clientY - r.top) / r.height * 100;
+        x = Math.round(Math.min(100, Math.max(0, x)) * 10) / 10;
+        y = Math.round(Math.min(100, Math.max(0, y)) * 10) / 10;
+        if (s.placing) {
+          this.setState((st) => {
+            const n = st.nextRep;
+            const code = 'R' + n;
+            return {
+              newReps: st.newReps.concat([{ id: code, code: code, name: 'Repeater ' + n + ', new', kind: 'repeater', x: x, y: y, age: 0, silent: false, battery: 'Unknown', pending: true }]),
+              nextRep: n + 1, placing: false, showReps: true,
+              log: this.pushLog(st, 'Command added ' + code + ' to the map, waiting for first check-in')
+            };
+          });
+        } else {
+          this.setState({ draft: { x: x, y: y }, confirm: null, tab: 'units' });
+        }
+      },
+      incidents: incidents,
+      hasDraft: !!s.draft,
+      noDraft: !s.draft,
+      draftX: s.draft ? s.draft.x : 0,
+      draftY: s.draft ? s.draft.y : 0,
+      draftLabel: 'Incident ' + s.nextInc + ' (draft)',
+      draftCoords: s.draft ? s.draft.x + '%, ' + s.draft.y + '% of map' : '',
+      clearDraft: () => this.setState({ draft: null, confirm: null }),
+      nearest: nearest,
+      excluded: excluded,
+      noneEligible: !!s.draft && nearest.length === 0,
+      hasExcluded: excluded.length > 0,
+      repMarkers: repMarkers,
+      unitMarkers: unitMarkers,
+      placing: s.placing,
+      ff3: () => this.setState({ tOff: s.tOff + 3 }),
+      ff10: () => this.setState({ tOff: s.tOff + 10 }),
+      ff0: () => this.setState({ tOff: 0 }),
+      tOff: s.tOff,
+      log: s.log.map((l) => ({ w: l.w, t: l.t })),
+      unitsTab: unitsTab,
+      repsTab: !unitsTab,
+      unitsTabBg: unitsTab ? '#ffffff' : 'transparent',
+      repsTabBg: unitsTab ? 'transparent' : '#ffffff',
+      showUnits: () => this.setState({ tab: 'units' }),
+      showRepsTab: () => this.setState({ tab: 'repeaters' }),
+      unitCount: units.length,
+      repCount: reps.length,
+      unitRows: unitRows,
+      repRows: repRows,
+      placeBtnText: s.placing ? 'Cancel placing' : 'Add repeater on map',
+      placeBtnBg: s.placing ? '#3b4350' : '#0e7490',
+      togglePlacing: () => this.setState({ placing: !s.placing })
+    };
+  }
+}
+</script>
+</body>
+</html>
