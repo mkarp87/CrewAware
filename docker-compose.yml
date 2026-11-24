@@ -44,9 +44,12 @@ services:
       CREWAWARE_SECRET_KEY: ${CREWAWARE_SECRET_KEY:-}
       CREWAWARE_REPEATER_POLL_SECS: ${CREWAWARE_REPEATER_POLL_SECS:-900}
       CREWAWARE_SIM: ${CREWAWARE_SIM:-0}
+      CREWAWARE_RADIO: ${CREWAWARE_RADIO:-}
+      CREWAWARE_UNIT_POLL_SECS: ${CREWAWARE_UNIT_POLL_SECS:-300}
       CREWAWARE_SIM_PARKED_SECS: ${CREWAWARE_SIM_PARKED_SECS:-900}
       CREWAWARE_COOKIE_SECURE: ${CREWAWARE_COOKIE_SECURE:-0}
-    # When the MeshCore USB gateway exists and the host is Linux, pass the companion node through:
+    # Serial gateway (CREWAWARE_RADIO=serial:/dev/ttyACM0) on a Linux host: pass the companion node through.
+    # Docker Desktop on macOS or Windows cannot do this; use tcp://host:port instead (see README).
     # devices:
     #   - /dev/ttyACM0:/dev/ttyACM0
     # group_add:

@@ -1,6 +1,6 @@
 # CrewAware: Build Plan
 
-Status: draft v0.1, 2026-11-23
+Status: v0.2, 2026-11-24. M1 to M5 are built and tested against a fake radio. Spikes S1 to S7 and the pilot (M7) are still to do with real hardware; M6 packaging is Docker Compose only.
 
 A self-contained incident-command app that shows where UTVs are on a site overlay, finds the nearest available unit for an incident, and tracks the status of the LoRa repeaters that carry the signal. Position data comes from MeshCore LoRa trackers.
 
@@ -222,6 +222,7 @@ Each spike should end with a written result in this repo.
 
 ## 10. Milestones
 
+- **Progress:** M1 to M5 done in software (gateway crate with codec, client and fake radio; routing with walls, gates, no-go and slow zones; site profiles; alerts; reports). M6 is Docker Compose (Linux/macOS/Windows hosts); native service installs are not done. Every radio behaviour is written from the firmware sources and checked only against the fake, so spikes S1 to S3 are the next real work.
 - **M0, spikes:** S1 to S3 minimum, with the simulator started.
 - **M1, live map:** gateway service, SQLite, WebSocket, a map with unit markers and ages. Works with the simulator and real hardware.
 - **M2, overlay and site profiles:** overlay upload and two-point pinning, site export and import, active-site switch with confirmation.

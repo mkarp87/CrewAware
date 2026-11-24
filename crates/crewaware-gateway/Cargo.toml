@@ -1,0 +1,17 @@
+[package]
+name = "crewaware-gateway"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "MeshCore companion-radio gateway for CrewAware, with a fake radio for tests and demos"
+
+[dependencies]
+anyhow.workspace = true
+rand.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tokio-serial = { version = "5", default-features = false }
+tracing.workspace = true
+tracing-subscriber.workspace = true

@@ -10,7 +10,8 @@
 --av:#2e9e5b;--dp:#e08a00;--os:#8a5cf0;--bs:#c9a400;--off:#6b7280;--late:#f0b429;--bad:#e5484d}
 *{box-sizing:border-box}
 html,body{height:100%;margin:0;background:var(--bg);color:var(--tx);font:14px/1.4 system-ui,Segoe UI,Roboto,sans-serif}
-header{display:flex;align-items:center;gap:12px;padding:8px 14px;background:var(--panel);border-bottom:1px solid var(--line);height:52px}
+body{display:flex;flex-direction:column}
+header{display:flex;align-items:center;gap:12px;padding:8px 14px;background:var(--panel);border-bottom:1px solid var(--line);height:52px;flex:none}
 header img{height:34px;max-width:140px;object-fit:contain;background:#fff;border-radius:4px;padding:2px}
 header .brand{font-weight:700;font-size:18px}
 header .slogan{color:var(--mut)}
@@ -18,33 +19,49 @@ header .sp{flex:1}
 header input{background:#0e131a;border:1px solid var(--line);color:var(--tx);border-radius:6px;padding:5px 8px;width:140px}
 .dot{width:10px;height:10px;border-radius:50%;background:var(--bad);display:inline-block}
 .dot.on{background:var(--av)}
-main{display:grid;grid-template-columns:1fr 380px;height:calc(100% - 52px)}
+#alerts{flex:none}
+#alerts .alert{padding:6px 14px;font-size:13px;cursor:pointer;border-bottom:1px solid #0006}
+#alerts .alert.warn{background:#5b4a10;color:#ffe9a8}
+#alerts .alert.crit{background:#7a1f23;color:#fff;font-weight:600}
+main{display:grid;grid-template-columns:1fr 400px;flex:1;min-height:0}
 #mapwrap{position:relative;overflow:hidden;background:#0b0f14;touch-action:none}
-#map{width:100%;height:100%;display:block;cursor:grab}
+#map{width:100%;height:100%;display:block;cursor:grab;user-select:none}
 #map.place{cursor:crosshair}
-.tools{position:absolute;left:10px;top:10px;display:flex;gap:6px}
+.tools{position:absolute;left:10px;top:10px;display:flex;gap:6px;flex-wrap:wrap;max-width:60%}
+#drawbar{position:absolute;left:50%;transform:translateX(-50%);bottom:56px;background:#18202bee;border:1px solid var(--acc);border-radius:8px;padding:8px 10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;max-width:92%;z-index:2}
+#drawbar[hidden]{display:none}
+#drawbar{pointer-events:none;background:#18202bcc}
+#drawbar input,#drawbar button,#drawbar label{pointer-events:auto}
 button{background:#223044;color:var(--tx);border:1px solid var(--line);border-radius:6px;padding:6px 10px;cursor:pointer;font:inherit}
 button:hover{background:#2a3d55}button.pri{background:var(--acc);color:#04111f;border-color:var(--acc);font-weight:600}
+button.danger{border-color:#7a3035;color:#ffb4b6}
 button.on{outline:2px solid var(--acc)}button:disabled{opacity:.5;cursor:not-allowed}
+button.sm{padding:3px 8px;font-size:12px}
+a{color:var(--acc)}
 aside{background:var(--panel);border-left:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
 .tabs{display:flex;border-bottom:1px solid var(--line)}
 .tabs button{flex:1;border:0;border-radius:0;background:transparent;padding:10px;color:var(--mut)}
 .tabs button.act{color:var(--tx);box-shadow:inset 0 -2px 0 var(--acc)}
+.subtabs{display:flex;gap:4px;margin-bottom:8px;flex-wrap:wrap}
+.subtabs button{padding:4px 10px;font-size:13px;background:transparent;color:var(--mut)}
+.subtabs button.act{color:var(--tx);border-color:var(--acc)}
 .body{overflow:auto;padding:10px;flex:1}
 .row{display:flex;align-items:center;gap:8px;padding:7px 6px;border-bottom:1px solid var(--line)}
-.row .nm{flex:1;min-width:0}.row .sub{color:var(--mut);font-size:12px}
+.row .nm{flex:1;min-width:0}.row .sub,.sub{color:var(--mut);font-size:12px}
 .chip{border-radius:10px;padding:1px 8px;font-size:12px;color:#fff;white-space:nowrap}
 .chip.available{background:var(--av)}.chip.dispatched{background:var(--dp)}.chip.on_scene{background:var(--os)}
 .chip.busy{background:var(--bs);color:#111}.chip.off_duty{background:var(--off)}
 .ct-late{color:var(--late)}.ct-no_contact{color:var(--bad)}
-select,input[type=text],input[type=number]{background:#0e131a;color:var(--tx);border:1px solid var(--line);border-radius:6px;padding:4px 6px;font:inherit}
+select,input[type=text],input[type=number],input[type=password]{background:#0e131a;color:var(--tx);border:1px solid var(--line);border-radius:6px;padding:4px 6px;font:inherit;min-width:0}
 h3{margin:14px 0 6px;font-size:13px;color:var(--mut);text-transform:uppercase;letter-spacing:.05em}
 .card{border:1px solid var(--line);border-radius:8px;padding:10px;margin-bottom:10px;background:#141b25}
 .err{color:var(--bad);margin:6px 0}
 .log div{padding:3px 0;border-bottom:1px solid var(--line);font-size:13px}.log time{color:var(--mut);margin-right:6px}
+.log .sys b{color:var(--late)}
 .grid2{display:grid;grid-template-columns:auto 1fr;gap:6px 8px;align-items:center}
 .legend{position:absolute;left:10px;bottom:10px;background:#18202bdd;border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:12px;display:flex;gap:10px;flex-wrap:wrap;max-width:70%}
 .legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:4px}
+.acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
 @media(max-width:800px){main{grid-template-columns:1fr;grid-template-rows:55% 45%}aside{border-left:0;border-top:1px solid var(--line)}}
 </style>
 </head>
@@ -55,15 +72,24 @@ h3{margin:14px 0 6px;font-size:13px;color:var(--mut);text-transform:uppercase;le
   <span class="slogan" id="slogan"></span>
   <span class="sp"></span>
   <span id="siteName" style="color:var(--mut)"></span>
+  <button id="btnSound" class="sm" title="Beep when a unit working an incident loses contact">Sound off</button>
   <label>Seat <input id="seat" placeholder="your name" maxlength="40"></label>
   <span class="dot" id="conn" title="connection"></span>
 </header>
+<div id="alerts" hidden></div>
 <main>
   <div id="mapwrap">
     <svg id="map"></svg>
     <div class="tools">
       <button id="btnPlace" class="pri">Place incident</button>
       <button id="btnFit">Fit</button>
+      <button id="btnEdit" hidden title="Drag repeaters to where they stand">Edit map</button>
+    </div>
+    <div id="drawbar" hidden>
+      <b id="drawTitle"></b><span class="sub" id="drawCount"></span>
+      <input type="text" id="drawName" placeholder="name (optional)" maxlength="60" style="width:150px">
+      <label id="drawFactorWrap" hidden>Speed <input type="number" id="drawFactor" value="50" min="5" max="100" style="width:60px">%</label>
+      <button id="drawFinish" class="pri">Finish</button><button id="drawUndo">Undo point</button><button id="drawCancel">Cancel</button>
     </div>
     <div class="legend" id="legend"></div>
   </div>
@@ -77,24 +103,38 @@ h3{margin:14px 0 6px;font-size:13px;color:var(--mut);text-transform:uppercase;le
 const STATUSES=[["available","Available"],["dispatched","Dispatched"],["on_scene","On scene"],["busy","Busy"],["off_duty","Off duty"]];
 const SLABEL=Object.fromEntries(STATUSES);
 const SCOL={available:"#2e9e5b",dispatched:"#e08a00",on_scene:"#8a5cf0",busy:"#c9a400",off_duty:"#6b7280"};
+const KINDS={wall:"Wall",gate:"Gate",no_go:"No-go area",slow:"Slow zone"};
 const NS="http://www.w3.org/2000/svg";
-let S=null;            // latest snapshot
+let S=null;            // latest state: snapshot plus radio
 let tab="units";
+let setupTab="site";
 let placing=false;
 let sel=null;          // selected incident id
 let cands=[];          // nearest list for selected incident
 let picked=new Set();  // unit ids ticked for dispatch
+let hoverUnit=null;    // unit id whose route is highlighted
 let errMsg="";
 let view={x:0,y:0,k:1};// pan/zoom: screen = (p*k)+x
 let fitted=false;
 let dragging=null;
 let adminState={admin:false};
+let draw=null;         // {kind, pts:[[px,py]...]} while drawing an obstacle
+let editMap=false;     // admin can drag repeaters
+let placeRep=null;     // repeater id waiting for a map click
+let repDrag=null;      // {id,px,py,moved}
+let profiles=null;     // saved sites, loaded on demand
+let confirmKey=null,confirmTimer=null;
+let soundOn=localStorage.getItem("crewaware.sound")==="1";
+let seenCrit=new Set();
+let radioSig="";
 
 // ---------- helpers ----------
+const $=id=>document.getElementById(id);
 function h(tag,attrs,...kids){
   const e=document.createElement(tag);
   for(const [k,v] of Object.entries(attrs||{})){
     if(k==="class")e.className=v; else if(k.startsWith("on"))e.addEventListener(k.slice(2),v);
+    else if(k==="checked"||k==="selected"||k==="value"||k==="disabled"){if(v)e[k]=v; if(k==="value"&&v!=null)e.value=v;}
     else if(v===true)e.setAttribute(k,""); else if(v!==false&&v!=null)e.setAttribute(k,v);
   }
   for(const c of kids.flat()){ if(c==null||c===false)continue; e.append(c.nodeType?c:document.createTextNode(String(c))); }
@@ -106,7 +146,7 @@ function sv(tag,attrs,...kids){
   for(const c of kids.flat()){ if(c==null)continue; e.append(c.nodeType?c:document.createTextNode(String(c))); }
   return e;
 }
-const seat=()=>document.getElementById("seat").value.trim()||"unknown";
+const seat=()=>$("seat").value.trim()||"unknown";
 async function api(path,body,method){
   const opt={method:method||(body!==undefined?"POST":"GET"),headers:{"X-Seat":seat()}};
   if(body!==undefined&&!(body instanceof Blob)){opt.headers["Content-Type"]="application/json";opt.body=JSON.stringify(body);}
@@ -118,6 +158,7 @@ async function api(path,body,method){
   return j;
 }
 async function act(fn){
+  forceBody=true;
   try{errMsg="";await fn();}catch(e){errMsg=e.message;}
   render();
 }
@@ -133,6 +174,8 @@ function fmtEta(sec){
   return Math.round(sec/60)+" min";
 }
 function fmtTime(t){return new Date(t).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit",second:"2-digit"});}
+const shortKey=k=>k?k.slice(0,8)+"…":"";
+const v=id=>$(id).value;
 
 // ---------- georeference (two anchors, no rotation) ----------
 function geoOK(s){return s.b.px!==s.a.px&&s.b.py!==s.a.py&&s.b.lon!==s.a.lon&&s.b.lat!==s.a.lat;}
@@ -144,7 +187,7 @@ function toLL(s,px,py){
 }
 
 // ---------- map ----------
-const map=document.getElementById("map");
+const map=$("map");
 function mapSize(){const r=map.getBoundingClientRect();return [r.width,r.height];}
 function fit(){
   if(!S)return;
@@ -152,6 +195,25 @@ function fit(){
   const k=Math.min(W/iw,H/ih)*0.96;
   view={k,x:(W-iw*k)/2,y:(H-ih*k)/2};
   fitted=true;
+}
+function pts2str(p){return p.map(q=>q[0]+","+q[1]).join(" ");}
+function drawObstacles(g,inv){
+  for(const o of S.obstacles||[]){
+    const p=o.points; if(!p||p.length<2)continue;
+    if(o.kind==="wall"){
+      g.append(sv("polyline",{points:pts2str(p),fill:"none",stroke:"#ff6b6b","stroke-width":4*inv,"stroke-linecap":"round","stroke-linejoin":"round"}));
+    }else if(o.kind==="gate"){
+      g.append(sv("polyline",{points:pts2str(p),fill:"none",stroke:o.open?"#2e9e5b":"#ff9f43","stroke-width":5*inv,"stroke-dasharray":o.open?`${2*inv} ${8*inv}`:`${10*inv} ${5*inv}`,"stroke-linecap":"butt"}));
+      const m=p[Math.floor(p.length/2)];
+      g.append(sv("text",{x:m[0]+6*inv,y:m[1],fill:o.open?"#9be3b5":"#ffcf9e","font-size":11*inv,"paint-order":"stroke",stroke:"#000","stroke-width":3*inv},(o.name||"Gate")+(o.open?" (open)":" (closed)")));
+    }else if(o.kind==="no_go"){
+      g.append(sv("polygon",{points:pts2str(p),fill:"rgba(229,72,77,.28)",stroke:"#e5484d","stroke-width":2*inv}));
+    }else if(o.kind==="slow"){
+      g.append(sv("polygon",{points:pts2str(p),fill:"rgba(240,180,41,.22)",stroke:"#f0b429","stroke-width":2*inv,"stroke-dasharray":`${6*inv} ${4*inv}`}));
+      const c=p.reduce((a,q)=>[a[0]+q[0]/p.length,a[1]+q[1]/p.length],[0,0]);
+      g.append(sv("text",{x:c[0],y:c[1],fill:"#ffe9a8","font-size":11*inv,"text-anchor":"middle","paint-order":"stroke",stroke:"#000","stroke-width":3*inv},(o.name?o.name+" ":"")+Math.round(o.factor*100)+"%"));
+    }
+  }
 }
 function drawMap(){
   if(!S)return;
@@ -166,14 +228,29 @@ function drawMap(){
     for(let y=100;y<ih;y+=100)g.append(sv("line",{x1:0,y1:y,x2:iw,y2:y,stroke:"#1d2836","stroke-width":1/view.k}));
   }
   const inv=1/view.k; // markers keep constant screen size
+  drawObstacles(g,inv);
+  // routes for the units ticked for dispatch, and the one under the pointer
+  const showRoutes=new Set([...picked]); if(hoverUnit)showRoutes.add(hoverUnit);
+  for(const c of cands){
+    if(!showRoutes.has(c.unit_id)||!c.path_px||c.path_px.length<2)continue;
+    g.append(sv("polyline",{points:pts2str(c.path_px),fill:"none",stroke:"#4da3ff","stroke-width":3*inv,"stroke-dasharray":`${8*inv} ${5*inv}`,"stroke-linejoin":"round"}));
+  }
   if(ok){
     for(const r of S.repeaters){
       if(!r.placed)continue;
-      const [x,y]=toPx(s,r.lat,r.lon);
+      let [x,y]=toPx(s,r.lat,r.lon);
+      if(repDrag&&repDrag.id===r.id){x=repDrag.px;y=repDrag.py;}
       const col=r.contact==="normal"?"#2e9e5b":r.contact==="late"?"#f0b429":"#e5484d";
-      const m=sv("g",{transform:`translate(${x} ${y}) scale(${inv})`});
+      const m=sv("g",{transform:`translate(${x} ${y}) scale(${inv})`,style:editMap&&adminState.admin?"cursor:grab":""});
       m.append(sv("polygon",{points:"0,-10 9,6 -9,6",fill:col,stroke:"#fff","stroke-width":1.5}));
-      m.append(sv("text",{x:12,y:4,fill:"#dfe7f2","font-size":12},r.name+(r.contact==="normal"?"":" ("+(r.contact==="late"?"late":"no contact")+")")));
+      if(editMap&&adminState.admin)m.append(sv("circle",{r:16,fill:"none",stroke:"#4da3ff","stroke-width":2,"stroke-dasharray":"3 3"}));
+      m.append(sv("text",{x:12,y:4,fill:"#dfe7f2","font-size":12,"paint-order":"stroke",stroke:"#000","stroke-width":3},r.name+(r.contact==="normal"?"":" ("+(r.contact==="late"?"late":"no contact")+")")));
+      if(editMap&&adminState.admin){
+        m.addEventListener("pointerdown",ev=>{
+          ev.stopPropagation(); map.setPointerCapture(ev.pointerId);
+          repDrag={id:r.id,px:x,py:y,moved:false,sx:ev.clientX,sy:ev.clientY};
+        });
+      }
       g.append(m);
     }
     for(const i of S.incidents){
@@ -181,7 +258,7 @@ function drawMap(){
       const m=sv("g",{transform:`translate(${x} ${y}) scale(${inv})`,style:"cursor:pointer"});
       m.append(sv("circle",{r:13,fill:"none",stroke:i.id===sel?"#fff":"#e5484d","stroke-width":3}));
       m.append(sv("path",{d:"M-6,-6 L6,6 M6,-6 L-6,6",stroke:"#e5484d","stroke-width":3}));
-      m.append(sv("text",{x:16,y:4,fill:"#ffb4b6","font-size":13,"font-weight":700},i.label));
+      m.append(sv("text",{x:16,y:4,fill:"#ffb4b6","font-size":13,"font-weight":700,"paint-order":"stroke",stroke:"#000","stroke-width":3},i.label));
       m.addEventListener("click",ev=>{ev.stopPropagation();selectIncident(i.id);});
       g.append(m);
       // lines to dispatched units
@@ -200,12 +277,17 @@ function drawMap(){
       if(u.contact==="late")m.append(sv("circle",{r:15,fill:"none",stroke:"#f0b429","stroke-width":3,"stroke-dasharray":"4 3"}));
       m.append(sv("circle",{r:9,fill,stroke:"#fff","stroke-width":2}));
       if(gray)m.append(sv("path",{d:"M-4,-4 L4,4 M4,-4 L-4,4",stroke:"#fff","stroke-width":2}));
-      const t=sv("text",{x:13,y:-6,fill:"#fff","font-size":12,"font-weight":600,"paint-order":"stroke",stroke:"#000","stroke-width":3},u.name);
-      m.append(t);
+      m.append(sv("text",{x:13,y:-6,fill:"#fff","font-size":12,"font-weight":600,"paint-order":"stroke",stroke:"#000","stroke-width":3},u.name));
       m.append(sv("text",{x:13,y:8,fill:"#cdd7e5","font-size":11,"paint-order":"stroke",stroke:"#000","stroke-width":3},
         SLABEL[u.status]+(u.contact==="normal"?"":" · "+(u.contact==="late"?"late ":"no contact ")+fmtAge(u.age_sec))));
       g.append(m);
     }
+  }
+  // the obstacle being drawn
+  if(draw&&draw.pts.length){
+    const closed=draw.kind==="no_go"||draw.kind==="slow";
+    g.append(sv(closed&&draw.pts.length>2?"polygon":"polyline",{points:pts2str(draw.pts),fill:closed?"rgba(77,163,255,.15)":"none",stroke:"#4da3ff","stroke-width":2*inv,"stroke-dasharray":`${5*inv} ${3*inv}`}));
+    for(const p of draw.pts)g.append(sv("circle",{cx:p[0],cy:p[1],r:4*inv,fill:"#4da3ff",stroke:"#fff","stroke-width":inv}));
   }
   map.replaceChildren(g);
 }
@@ -216,36 +298,97 @@ map.addEventListener("wheel",ev=>{
   const f=Math.exp(-ev.deltaY*0.0015), nk=Math.min(20,Math.max(0.05,view.k*f));
   view.x=mx-(mx-view.x)*(nk/view.k); view.y=my-(my-view.y)*(nk/view.k); view.k=nk; drawMap();
 },{passive:false});
+function mapPx(ev){
+  const r=map.getBoundingClientRect();
+  return [(ev.clientX-r.left-view.x)/view.k,(ev.clientY-r.top-view.y)/view.k];
+}
 map.addEventListener("pointerdown",ev=>{
+  if(repDrag)return;
   map.setPointerCapture(ev.pointerId);
   dragging={x:ev.clientX,y:ev.clientY,vx:view.x,vy:view.y,moved:false};
 });
 map.addEventListener("pointermove",ev=>{
+  if(repDrag){
+    if(Math.abs(ev.clientX-repDrag.sx)+Math.abs(ev.clientY-repDrag.sy)>3)repDrag.moved=true;
+    if(repDrag.moved){[repDrag.px,repDrag.py]=mapPx(ev);drawMap();}
+    return;
+  }
   if(!dragging)return;
   const dx=ev.clientX-dragging.x, dy=ev.clientY-dragging.y;
   if(Math.abs(dx)+Math.abs(dy)>4)dragging.moved=true;
   if(dragging.moved){view.x=dragging.vx+dx; view.y=dragging.vy+dy; drawMap();}
 });
 map.addEventListener("pointerup",ev=>{
+  if(repDrag){
+    const d=repDrag; repDrag=null;
+    if(d.moved&&S&&geoOK(S.site)){
+      const r=S.repeaters.find(q=>q.id===d.id);
+      const [lat,lon]=toLL(S.site,d.px,d.py);
+      if(r)act(()=>api("/api/repeaters",{id:r.id,name:r.name,lat,lon,placed:true}));
+    }else drawMap();
+    return;
+  }
   const d=dragging; dragging=null;
-  if(!d||d.moved||!placing||!S)return;
+  if(!d||d.moved||!S)return;
+  const [px,py]=mapPx(ev);
+  if(draw){
+    draw.pts.push([Math.round(px*10)/10,Math.round(py*10)/10]);
+    drawBarUpdate(); drawMap(); return;
+  }
+  if(placeRep){
+    if(!geoOK(S.site)){errMsg="Set the two overlay anchors in Setup before placing repeaters.";render();return;}
+    const r=S.repeaters.find(q=>q.id===placeRep); placeRep=null;
+    if(r){const [lat,lon]=toLL(S.site,px,py);act(()=>api("/api/repeaters",{id:r.id,name:r.name,lat,lon,placed:true}));}
+    return;
+  }
+  if(!placing)return;
   if(!geoOK(S.site)){errMsg="Set the two overlay anchors in Setup before placing incidents.";render();return;}
-  const r=map.getBoundingClientRect();
-  const px=(ev.clientX-r.left-view.x)/view.k, py=(ev.clientY-r.top-view.y)/view.k;
   const [lat,lon]=toLL(S.site,px,py);
-  placing=false; map.classList.remove("place"); document.getElementById("btnPlace").classList.remove("on");
+  placing=false; map.classList.remove("place"); $("btnPlace").classList.remove("on");
   act(async()=>{const inc=await api("/api/incidents",{lat,lon,label:""}); await selectIncident(inc.id,inc);});
 });
-document.getElementById("btnPlace").onclick=()=>{
+$("btnPlace").onclick=()=>{
   placing=!placing; map.classList.toggle("place",placing);
-  document.getElementById("btnPlace").classList.toggle("on",placing);
+  $("btnPlace").classList.toggle("on",placing);
 };
-document.getElementById("btnFit").onclick=()=>{fit();drawMap();};
+$("btnFit").onclick=()=>{fit();drawMap();};
+$("btnEdit").onclick=()=>{editMap=!editMap;$("btnEdit").classList.toggle("on",editMap);drawMap();};
 window.addEventListener("resize",()=>{drawMap();});
+window.addEventListener("keydown",ev=>{
+  if(draw&&ev.key==="Escape")cancelDraw();
+});
+
+// ---------- obstacle drawing ----------
+function startDraw(kind){
+  draw={kind,pts:[]}; placing=false; placeRep=null;
+  map.classList.add("place");
+  $("drawTitle").textContent="Drawing: "+KINDS[kind];
+  $("drawFactorWrap").hidden=kind!=="slow";
+  $("drawName").value="";
+  $("drawbar").hidden=false;
+  drawBarUpdate(); drawMap();
+}
+function drawBarUpdate(){
+  if(!draw)return;
+  const need=(draw.kind==="wall"||draw.kind==="gate")?2:3;
+  $("drawCount").textContent=" click the map to add points ("+draw.pts.length+", need "+need+")";
+  $("drawFinish").disabled=draw.pts.length<need;
+}
+function cancelDraw(){
+  draw=null; map.classList.remove("place"); $("drawbar").hidden=true; drawMap();
+}
+$("drawCancel").onclick=cancelDraw;
+$("drawUndo").onclick=()=>{if(draw){draw.pts.pop();drawBarUpdate();drawMap();}};
+$("drawFinish").onclick=()=>{
+  if(!draw)return;
+  const o={id:0,kind:draw.kind,name:$("drawName").value.trim(),points:draw.pts,open:false,factor:draw.kind==="slow"?Math.min(1,Math.max(0.05,(+$("drawFactor").value||50)/100)):1};
+  cancelDraw();
+  act(()=>api("/api/obstacles",o));
+};
 
 // ---------- incidents ----------
 async function selectIncident(id,inc){
-  sel=id; tab="incident"; picked=new Set(); cands=[];
+  sel=id; tab="incident"; picked=new Set(); cands=[]; hoverUnit=null;
   const i=inc||S.incidents.find(q=>q.id===id);
   if(i){
     try{cands=await api(`/api/nearest?lat=${i.lat}&lon=${i.lon}`);}catch(e){errMsg=e.message;}
@@ -261,12 +404,11 @@ async function refreshCands(){
 
 // ---------- panels ----------
 function tabsRender(){
-  const t=document.getElementById("tabs"); t.replaceChildren();
+  const t=$("tabs"); t.replaceChildren();
   for(const [id,label] of [["units","Units"],["incident","Incident"],["log","Log"],["setup","Setup"]]){
-    t.append(h("button",{class:tab===id?"act":"",onclick:()=>{tab=id;render();}},label));
+    t.append(h("button",{class:tab===id?"act":"",onclick:()=>{tab=id;forceBody=true;render();}},label));
   }
 }
-// Field names are provisional until the radio gateway defines what a repeater returns.
 function readingText(r){
   if(!r.has_credentials)return "no password stored, so it is not being read";
   const rd=r.reading;
@@ -284,13 +426,22 @@ function unitsPanel(){
   const b=h("div");
   for(const u of S.units){
     const sel_=h("select",{onchange:ev=>act(()=>api(`/api/units/${encodeURIComponent(u.id)}/status`,{status:ev.target.value}))},
-      STATUSES.map(([v,l])=>h("option",{value:v,selected:u.status===v},l)));
+      STATUSES.map(([x,l])=>h("option",{value:x,selected:u.status===x},l)));
     const cls=u.contact==="normal"?"":" ct-"+u.contact;
     const sub=!u.has_pos?"no position yet":
       (u.contact==="normal"?"":(u.contact==="late"?"late · ":"no contact · "))+"last heard "+fmtAge(u.age_sec)+" ago · "+u.speed_mph.toFixed(0)+" mph"+(u.battery>=0?" · "+u.battery+"%":"");
     b.append(h("div",{class:"row"},
       h("div",{class:"nm"},h("div",null,u.name," ",h("span",{class:"sub"},"("+u.group_name+")")),h("div",{class:"sub"+cls},sub)),
       sel_));
+  }
+  if(!S.units.length)b.append(h("p",{class:"sub"},"No units yet. An admin can add them in Setup, or adopt nodes the radio has heard (Setup, Radio)."));
+  const gates=(S.obstacles||[]).filter(o=>o.kind==="gate");
+  if(gates.length){
+    b.append(h("h3",null,"Gates"));
+    for(const o of gates){
+      b.append(h("div",{class:"row"},h("div",{class:"nm"},o.name||"Gate "+o.id,h("div",{class:"sub"},o.open?"open: routes may pass":"closed: routes go around")),
+        h("button",{class:o.open?"":"pri",onclick:()=>act(()=>api(`/api/obstacles/${o.id}/gate`,{open:!o.open}))},o.open?"Close gate":"Open gate")));
+    }
   }
   const rp=S.repeaters.length?[h("h3",null,"Repeaters")]:[];
   for(const r of S.repeaters){
@@ -304,6 +455,15 @@ function unitsPanel(){
   b.append(...rp);
   return b;
 }
+function candLine(c){
+  const dis=c.contact==="no_contact";
+  const hasObs=(S.obstacles||[]).length>0;
+  let how="";
+  if(c.routed&&c.dist_m>c.straight_m*1.1)how=" by route (straight line "+fmtDist(c.straight_m*3.2808)+")";
+  else if(c.routed)how=" by route";
+  else if(hasObs)how=" straight line, NO ROUTE FOUND";
+  return fmtDist(c.dist_ft)+how+" · ETA "+(c.routed?"":"≥ ")+fmtEta(c.eta_sec)+(dis?" · NO CONTACT, last heard "+fmtAge(c.age_sec)+" ago":c.contact==="late"?" · late "+fmtAge(c.age_sec):"");
+}
 function incidentPanel(){
   const b=h("div");
   if(!S.incidents.length){
@@ -315,7 +475,7 @@ function incidentPanel(){
   if(!i){b.append(h("p",{class:"sub"},"Select an incident."));return b;}
   b.append(h("div",{class:"card"},
     h("div",null,h("b",null,i.label)),
-    h("div",{class:"sub"},"Opened "+fmtTime(i.opened)+" by "+i.opened_by)));
+    h("div",{class:"sub"},"Opened "+fmtTime(i.opened)+" by "+i.opened_by+" · ",h("a",{href:`/api/incidents/${i.id}/report`,target:"_blank"},"report"))));
   if(i.units&&i.units.length){
     b.append(h("h3",null,"Assigned"));
     for(const uid of i.units){
@@ -328,13 +488,14 @@ function incidentPanel(){
   if(!cands.length)b.append(h("p",{class:"sub"},"No available units with a position."));
   for(const c of cands){
     const dis=c.contact==="no_contact";
-    b.append(h("label",{class:"row",style:"cursor:pointer"},
-      h("input",{type:"checkbox",checked:picked.has(c.unit_id),onchange:ev=>{ev.target.checked?picked.add(c.unit_id):picked.delete(c.unit_id);renderDispatchBtn();}}),
+    b.append(h("label",{class:"row",style:"cursor:pointer",onmouseenter:()=>{hoverUnit=c.unit_id;drawMap();},onmouseleave:()=>{hoverUnit=null;drawMap();}},
+      h("input",{type:"checkbox",checked:picked.has(c.unit_id),onchange:ev=>{ev.target.checked?picked.add(c.unit_id):picked.delete(c.unit_id);renderDispatchBtn();drawMap();}}),
       h("div",{class:"nm"},h("div",null,c.name," ",h("span",{class:"sub"},"("+c.group+")")),
-        h("div",{class:"sub"+(dis?" ct-no_contact":c.contact==="late"?" ct-late":"")},
-          fmtDist(c.dist_ft)+" · ETA ≥ "+fmtEta(c.eta_sec)+(dis?" · NO CONTACT, last heard "+fmtAge(c.age_sec)+" ago":c.contact==="late"?" · late "+fmtAge(c.age_sec):"")))));
+        h("div",{class:"sub"+(dis?" ct-no_contact":c.contact==="late"?" ct-late":"")},candLine(c)))));
   }
-  b.append(h("div",{class:"sub",style:"margin:6px 0"},"ETA is straight-line at the group's speed. It ignores walls and obstacles until routing is added."));
+  b.append(h("div",{class:"sub",style:"margin:6px 0"},(S.obstacles||[]).length
+    ?"Distance and ETA follow a route around the walls, closed gates and no-go areas drawn in Setup, and slow zones count at their reduced speed. Units are ranked by ETA."
+    :"ETA is straight-line at the group's speed. Draw walls and no-go areas in Setup, Obstacles, to route around them."));
   b.append(h("div",{style:"display:flex;gap:8px"},
     h("button",{class:"pri",id:"btnDispatch",onclick:()=>act(async()=>{
       await api(`/api/incidents/${i.id}/dispatch`,{units:[...picked]}); picked=new Set(); await refreshCands();
@@ -344,42 +505,69 @@ function incidentPanel(){
   return b;
 }
 function renderDispatchBtn(){
-  const b=document.getElementById("btnDispatch"); if(!b)return;
+  const b=$("btnDispatch"); if(!b)return;
   b.disabled=picked.size===0; b.textContent=picked.size>1?`Dispatch ${picked.size} units`:"Dispatch";
 }
 function logPanel(){
-  const d=h("div",{class:"log"});
-  for(const l of S.log)d.append(h("div",null,h("time",null,fmtTime(l.t)),h("b",null,l.seat+": "),l.text));
-  if(!S.log.length)d.append(h("p",{class:"sub"},"Nothing yet."));
+  const d=h("div");
+  d.append(h("div",{class:"sub",style:"margin-bottom:6px"},h("a",{href:"/api/reports/incidents.csv"},"Download all incidents (CSV)")));
+  if(S.closed&&S.closed.length){
+    d.append(h("h3",null,"Recent closed incidents"));
+    for(const i of S.closed)d.append(h("div",{class:"row"},h("div",{class:"nm"},i.label,h("div",{class:"sub"},fmtTime(i.opened)+" · "+(i.units||[]).length+" unit(s)")),
+      h("a",{href:`/api/incidents/${i.id}/report`,target:"_blank"},"report")));
+  }
+  d.append(h("h3",null,"Activity"));
+  const l=h("div",{class:"log"});
+  for(const e of S.log)l.append(h("div",{class:e.seat==="system"?"sys":""},h("time",null,fmtTime(e.t)),h("b",null,e.seat+": "),e.text));
+  if(!S.log.length)l.append(h("p",{class:"sub"},"Nothing yet."));
+  d.append(l);
   return d;
 }
 function loginPanel(){
   const b=h("div");
   b.append(h("h3",null,"Admin login"));
-  b.append(h("div",{class:"sub"},"Setup changes the site, units, repeaters and branding, so it needs an admin account. Dispatching does not."));
+  b.append(h("div",{class:"sub"},"Setup changes the site, units, repeaters, obstacles and branding, so it needs an admin account. Dispatching does not."));
   b.append(h("div",{class:"card"},h("div",{class:"grid2"},
     "Username",h("input",{type:"text",id:"lu",autocomplete:"username"}),
     "Password",h("input",{type:"password",id:"lp",autocomplete:"current-password",onkeydown:ev=>{if(ev.key==="Enter")doLogin();}})),
-    h("div",{style:"margin-top:8px"},h("button",{class:"pri",onclick:doLogin},"Log in"))));
+    h("div",{style:"margin-top:8px"},h("button",{class:"pri",id:"btnLogin",onclick:doLogin},"Log in"))));
   return b;
 }
 async function doLogin(){
   try{
     errMsg="";
-    await api("/api/admin/login",{username:v("lu"),password:document.getElementById("lp").value});
+    await api("/api/admin/login",{username:v("lu"),password:$("lp").value});
     adminState=await api("/api/admin/me");
   }catch(e){errMsg=e.message;}
   forceBody=true;render();
 }
 async function doLogout(){
   try{await api("/api/admin/logout",{});}catch(e){}
-  adminState={admin:false};forceBody=true;render();
+  adminState={admin:false};editMap=false;forceBody=true;render();
 }
+
+// Two-step buttons for things that are hard to undo.
+function confirmBtn(key,label,confirmLabel,fn,cls){
+  const armed=confirmKey===key;
+  return h("button",{class:(armed?"danger on ":"")+(cls||""),onclick:()=>{
+    if(!armed){confirmKey=key;clearTimeout(confirmTimer);confirmTimer=setTimeout(()=>{confirmKey=null;forceBody=true;render();},5000);forceBody=true;render();}
+    else{confirmKey=null;clearTimeout(confirmTimer);fn();}
+  }},armed?confirmLabel:label);
+}
+
 function setupPanel(){
   if(!adminState.admin)return loginPanel();
-  const s=S.site, b=h("div");
+  const b=h("div");
   b.append(h("div",{class:"row"},h("div",{class:"nm sub"},"Signed in as "+adminState.username),h("button",{onclick:doLogout},"Log out")));
-  const st=S.settings;
+  const tabs=[["site","Site"],["obstacles","Obstacles"],["crew","Crew"],["radio","Radio"],["rules","Rules"]];
+  b.append(h("div",{class:"subtabs"},tabs.map(([id,l])=>h("button",{class:setupTab===id?"act":"",onclick:()=>{setupTab=id;forceBody=true;render();}},l))));
+  b.append(setupTab==="site"?sitePanel():setupTab==="obstacles"?obstaclesPanel():setupTab==="crew"?crewPanel():setupTab==="radio"?radioPanel():rulesPanel());
+  return b;
+}
+const num=(id,val)=>h("input",{type:"number",step:"any",id,value:val,style:"width:100%"});
+
+function rulesPanel(){
+  const st=S.settings, b=h("div");
   b.append(h("h3",null,"Contact rules (minutes)"));
   b.append(h("div",{class:"card"},h("div",{class:"grid2"},
     "Parked late after",h("input",{type:"number",step:"any",id:"s1",value:st.parked_late_min}),
@@ -388,8 +576,21 @@ function setupPanel(){
     "Moving no contact after",h("input",{type:"number",step:"any",id:"s4",value:st.moving_no_contact_min}),
     "Counts as moving at (mph)",h("input",{type:"number",step:"any",id:"s5",value:st.moving_min_mph})),
     h("div",{style:"margin-top:8px"},h("button",{onclick:()=>act(()=>api("/api/settings",{parked_late_min:+v("s1"),parked_no_contact_min:+v("s2"),moving_late_min:+v("s3"),moving_no_contact_min:+v("s4"),moving_min_mph:+v("s5")}))},"Save rules"))));
-  const num=(id,v)=>h("input",{type:"number",step:"any",id,value:v,style:"width:100%"});
-  b.append(h("h3",null,"Site"));
+  b.append(h("h3",null,"Vehicle groups (max speed)"));
+  for(const g of S.groups){
+    b.append(h("div",{class:"row"},h("div",{class:"nm"},g.name),h("span",{class:"sub"},g.max_mph+" mph × "+g.adjust)));
+  }
+  b.append(h("div",{class:"card"},h("div",{class:"grid2"},
+    "Group id",h("input",{type:"text",id:"gid",placeholder:"e.g. gator"}),
+    "Name",h("input",{type:"text",id:"gname"}),
+    "Max mph",num("gmph",15),"Adjust ×",num("gadj",0.8)),
+    h("div",{style:"margin-top:8px"},h("button",{onclick:()=>act(()=>api("/api/groups",{id:v("gid"),name:v("gname")||v("gid"),max_mph:+v("gmph"),adjust:+v("gadj")}))},"Add / update group"))));
+  return b;
+}
+
+function sitePanel(){
+  const s=S.site, b=h("div");
+  b.append(h("h3",null,"Active site"));
   b.append(h("div",{class:"card"},h("div",{class:"grid2"},
     "Name",h("input",{type:"text",id:"siteNameIn",value:s.name}),
     "Slogan",h("input",{type:"text",id:"sloganIn",value:s.slogan||"",maxlength:60,placeholder:"up to 60 characters"})),
@@ -403,30 +604,92 @@ function setupPanel(){
     "A lat,lon",h("span",{style:"display:flex;gap:4px"},num("alat",s.a.lat),num("alon",s.a.lon)),
     "B pixel x,y",h("span",{style:"display:flex;gap:4px"},num("bpx",s.b.px),num("bpy",s.b.py)),
     "B lat,lon",h("span",{style:"display:flex;gap:4px"},num("blat",s.b.lat),num("blon",s.b.lon))),
-    h("div",{style:"margin-top:8px"},h("button",{class:"pri",onclick:saveSite},"Save site"))));
-  b.append(h("h3",null,"Vehicle groups (max speed)"));
-  for(const g of S.groups){
-    b.append(h("div",{class:"row"},h("div",{class:"nm"},g.name),h("span",{class:"sub"},g.max_mph+" mph × "+g.adjust)));
+    h("div",{style:"margin-top:8px"},h("button",{class:"pri",id:"btnSaveSite",onclick:saveSite},"Save site"))));
+
+  b.append(h("h3",null,"Saved sites"));
+  b.append(h("div",{class:"sub"},"A saved site holds the overlay, its pinning, obstacles and where each repeater stands. Crew and passwords stay as they are when you switch."));
+  if(profiles===null){loadProfiles();b.append(h("p",{class:"sub"},"Loading…"));}
+  else{
+    for(const p of profiles){
+      b.append(h("div",{class:"row"},h("div",{class:"nm"},p.name,p.active?h("span",{class:"sub"}," (active)"):null),
+        p.active?null:confirmBtn("sw"+p.id,"Switch","Confirm switch",()=>act(async()=>{await api(`/api/admin/profiles/${p.id}/activate`,{});fitted=false;profiles=null;}),"sm"),
+        h("a",{href:`/api/admin/profiles/${p.id}/export`,download:""},"export"),
+        confirmBtn("del"+p.id,"Delete","Confirm delete",()=>act(async()=>{await api(`/api/admin/profiles/${p.id}`,undefined,"DELETE");profiles=null;}),"sm")));
+    }
+    if(!profiles.length)b.append(h("p",{class:"sub"},"None saved yet."));
   }
+  b.append(h("div",{class:"acts"},
+    h("button",{id:"btnSaveProfile",onclick:()=>act(async()=>{await api("/api/admin/profiles/save",{});profiles=null;})},"Save current site"),
+    h("a",{href:"/api/admin/site/export",download:"",style:"align-self:center"},"Export current site")));
+  b.append(h("div",{style:"margin-top:8px"},"Import a site file: ",h("input",{type:"file",id:"importFile",accept:"application/json,.json",onchange:ev=>importSite(ev.target.files[0])})));
+  return b;
+}
+async function loadProfiles(){
+  try{profiles=(await api("/api/admin/profiles")).profiles;}catch(e){profiles=[];errMsg=e.message;}
+  if(tab==="setup"&&setupTab==="site"){forceBody=true;render();}
+}
+async function importSite(file){
+  if(!file)return;
+  await act(async()=>{await api("/api/admin/profiles/import",file);profiles=null;});
+}
+
+function obstaclesPanel(){
+  const b=h("div");
+  b.append(h("div",{class:"sub"},"Draw on the map. Walls and closed gates cannot be crossed, no-go areas cannot be entered, slow zones can be crossed at a fraction of normal speed. Routes and ETAs for new incidents go around them. Points are placed on the overlay image, so they stay put if you adjust the anchors."));
+  b.append(h("div",{class:"acts"},Object.entries(KINDS).map(([k,l])=>h("button",{class:draw&&draw.kind===k?"on":"",onclick:()=>startDraw(k)},"Draw "+l.toLowerCase()))));
+  b.append(h("h3",null,"On this site"));
+  const list=S.obstacles||[];
+  if(!list.length)b.append(h("p",{class:"sub"},"Nothing drawn yet."));
+  for(const o of list){
+    b.append(h("div",{class:"row"},
+      h("div",{class:"nm"},(o.name||KINDS[o.kind]+" "+o.id),h("div",{class:"sub"},KINDS[o.kind]+" · "+o.points.length+" points"+(o.kind==="slow"?" · "+Math.round(o.factor*100)+"% speed":"")+(o.kind==="gate"?(o.open?" · open":" · closed"):""))),
+      o.kind==="gate"?h("button",{class:"sm",onclick:()=>act(()=>api(`/api/obstacles/${o.id}/gate`,{open:!o.open}))},o.open?"Close":"Open"):null,
+      confirmBtn("ob"+o.id,"Delete","Confirm",()=>act(()=>api(`/api/obstacles/${o.id}`,undefined,"DELETE")),"sm")));
+  }
+  return b;
+}
+
+function nodeOptions(kind,current){
+  const d=(S.radio&&S.radio.discovered)||[];
+  const opts=[h("option",{value:""},"— no radio node —")];
+  if(current)opts.push(h("option",{value:current,selected:true},"node "+shortKey(current)));
+  for(const x of d)if(x.kind===kind||x.kind==="unit"&&kind==="unit")opts.push(h("option",{value:x.key},x.name+" ("+shortKey(x.key)+")"));
+  return opts;
+}
+function crewPanel(){
+  const b=h("div");
+  b.append(h("h3",null,"Units"));
+  for(const u of S.units){
+    b.append(h("div",{class:"row",style:"flex-wrap:wrap"},
+      h("div",{class:"nm"},u.name,h("div",{class:"sub"},u.node_key?"radio node "+shortKey(u.node_key):"no radio node assigned")),
+      h("select",{title:"Vehicle group",onchange:ev=>act(()=>api(`/api/units/${encodeURIComponent(u.id)}/group`,{group:ev.target.value}))},
+        S.groups.map(g=>h("option",{value:g.id,selected:g.id===u.group_id},g.name))),
+      h("select",{title:"Radio node carried by this unit",style:"max-width:150px",onchange:ev=>act(()=>api(`/api/units/${encodeURIComponent(u.id)}/node`,{key:ev.target.value},"PUT"))},nodeOptions("unit",u.node_key)),
+      confirmBtn("ru"+u.id,"Remove","Confirm",()=>act(()=>api(`/api/units/${encodeURIComponent(u.id)}`,undefined,"DELETE")),"sm")));
+  }
+  b.append(h("div",{class:"sub",style:"margin-top:6px"},"Add a unit by hand, or adopt one the radio has heard (Radio tab)."));
   b.append(h("div",{class:"card"},h("div",{class:"grid2"},
-    "Group id",h("input",{type:"text",id:"gid",placeholder:"e.g. gator"}),
-    "Name",h("input",{type:"text",id:"gname"}),
-    "Max mph",num("gmph",15),"Adjust ×",num("gadj",0.8)),
-    h("div",{style:"margin-top:8px"},h("button",{onclick:()=>act(()=>api("/api/groups",{id:v("gid"),name:v("gname")||v("gid"),max_mph:+v("gmph"),adjust:+v("gadj")}))},"Add / update group"))));
-  b.append(h("h3",null,"Add unit"));
-  b.append(h("div",{class:"card"},h("div",{class:"grid2"},
-    "Unit id",h("input",{type:"text",id:"uid",placeholder:"radio/contact id"}),
+    "Unit id",h("input",{type:"text",id:"uid",placeholder:"short id"}),
     "Name",h("input",{type:"text",id:"uname"}),
     "Group",h("select",{id:"ugrp"},S.groups.map(g=>h("option",{value:g.id},g.name)))),
     h("div",{style:"margin-top:8px"},h("button",{onclick:()=>act(()=>api("/api/units",{id:v("uid"),name:v("uname"),group:v("ugrp")}))},"Add unit"))));
-  b.append(h("h3",null,"Add or move repeater"));
+
+  b.append(h("h3",null,"Repeaters"));
+  b.append(h("div",{class:"sub"},"Use Edit map on the map, then drag a repeater to where it stands. Unplaced repeaters need a click on the map."));
+  for(const r of S.repeaters){
+    b.append(h("div",{class:"row",style:"flex-wrap:wrap"},
+      h("div",{class:"nm"},r.name,h("div",{class:"sub"},(r.placed?"placed":"not placed")+" · "+(r.node_key?"radio node "+shortKey(r.node_key):"no radio node assigned")+(r.has_credentials?" · password stored":" · no password"))),
+      h("button",{class:"sm"+(placeRep===r.id?" on":""),onclick:()=>{placeRep=placeRep===r.id?null:r.id;draw=null;$("drawbar").hidden=true;map.classList.toggle("place",!!placeRep);forceBody=true;render();}},placeRep===r.id?"Click the map…":(r.placed?"Move":"Place on map")),
+      h("select",{title:"Radio node for this repeater",style:"max-width:150px",onchange:ev=>act(()=>api(`/api/repeaters/${encodeURIComponent(r.id)}/node`,{key:ev.target.value},"PUT"))},nodeOptions("repeater",r.node_key)),
+      confirmBtn("rr"+r.id,"Remove","Confirm",()=>act(()=>api(`/api/repeaters/${encodeURIComponent(r.id)}`,undefined,"DELETE")),"sm")));
+  }
   b.append(h("div",{class:"card"},h("div",{class:"grid2"},
     "Id",h("input",{type:"text",id:"rid"}),"Name",h("input",{type:"text",id:"rname"}),
-    "Lat",num("rlat",s.a.lat),"Lon",num("rlon",s.a.lon)),
-    h("div",{style:"margin-top:8px"},h("button",{onclick:()=>act(()=>api("/api/repeaters",{id:v("rid"),name:v("rname"),lat:+v("rlat"),lon:+v("rlon"),placed:true,status:"unknown"}))},"Save repeater"))));
+    "Lat",num("rlat",S.site.a.lat),"Lon",num("rlon",S.site.a.lon)),
+    h("div",{style:"margin-top:8px"},h("button",{onclick:()=>act(()=>api("/api/repeaters",{id:v("rid"),name:v("rname"),lat:+v("rlat"),lon:+v("rlon"),placed:true}))},"Save repeater"))));
   if(S.repeaters.length){
     b.append(h("h3",null,"Repeater passwords"));
-    b.append(h("div",{class:"sub"},"Used to log in to a repeater so CrewAware can read it. Stored encrypted, never shown again. Leave the box empty and press Remove to delete one."));
+    b.append(h("div",{class:"sub"},"Used to log in to a repeater so CrewAware can read it. Read-only: nothing is changed on the repeater. Stored encrypted, never shown again. Leave the box empty and press Remove to delete one."));
     if(!credSel||!S.repeaters.some(r=>r.id===credSel))credSel=S.repeaters[0].id;
     b.append(h("div",{class:"card"},h("div",{class:"grid2"},
       "Repeater",h("select",{id:"credRep",onchange:ev=>{credSel=ev.target.value;}},
@@ -439,7 +702,39 @@ function setupPanel(){
   return b;
 }
 let credSel=null;
-const v=id=>document.getElementById(id).value;
+
+function radioPanel(){
+  const b=h("div"), r=S.radio||{mode:"none",discovered:[]};
+  const dot=h("span",{class:"dot"+(r.connected||r.mode==="sim"?" on":""),style:"margin-right:6px"});
+  b.append(h("h3",null,"Radio"));
+  if(r.mode==="none"){
+    b.append(h("div",{class:"card"},"No radio is configured. Set CREWAWARE_RADIO in the server's .env (a serial port such as /dev/ttyACM0, or tcp://host:port) and restart."));
+    return b;
+  }
+  if(r.mode==="sim"){
+    b.append(h("div",{class:"card"},dot,"Simulator: fake units and repeaters are generated inside the server. No radio is used."));
+    return b;
+  }
+  const lines=[h("div",null,dot,r.connected?"Connected to ":"Not connected ",h("b",null,r.name||"")),
+    h("div",{class:"sub"},[r.model,r.version].filter(Boolean).join(" ")+(r.key?" · key "+shortKey(r.key):"")),
+    h("div",{class:"sub"},r.connected?(r.contacts+" nodes known"+(r.sync_age_sec!=null?" · synced "+fmtAge(r.sync_age_sec)+" ago":"")):(r.error||"waiting for the radio"))];
+  b.append(h("div",{class:"card"},lines,h("div",{class:"acts"},
+    h("button",{class:"sm",disabled:!r.connected,onclick:()=>act(()=>api("/api/admin/radio/advert",{}))},"Send advert"))));
+  b.append(h("h3",null,"Heard on the mesh, not yet adopted"));
+  b.append(h("div",{class:"sub"},"Name it and choose what it is. A unit is a vehicle carrying a tracker; a repeater stands somewhere and is read over the air."));
+  if(!r.discovered.length)b.append(h("p",{class:"sub"},"Nothing new. Nodes appear here when the radio hears their adverts."));
+  for(const d of r.discovered){
+    const name=h("input",{type:"text",value:d.name,style:"flex:1"});
+    const kind=h("select",null,[["unit","Unit"],["repeater","Repeater"]].map(([x,l])=>h("option",{value:x,selected:x===(d.kind==="repeater"?"repeater":"unit")},l)));
+    const grp=h("select",null,S.groups.map(g=>h("option",{value:g.id},g.name)));
+    b.append(h("div",{class:"card"},
+      h("div",{class:"sub"},shortKey(d.key)+" · "+(d.kind==="room"?"room server · ":"")+(d.has_pos?"has position":"no position")+" · heard "+fmtAge(d.age_sec)+" ago"),
+      h("div",{style:"display:flex;gap:6px;margin-top:6px;flex-wrap:wrap"},name,kind,grp,
+        h("button",{class:"pri sm",onclick:()=>act(()=>api(`/api/admin/discovered/${d.key}/adopt`,{as:kind.value,name:name.value,group:grp.value})) },"Adopt"))));
+  }
+  return b;
+}
+
 function saveSite(){
   act(()=>api("/api/site",{name:v("siteNameIn"),slogan:v("sloganIn"),
     a:{px:+v("apx"),py:+v("apy"),lat:+v("alat"),lon:+v("alon")},
@@ -461,33 +756,57 @@ function upload(file,kind){
   }else sendFile(file,kind,"");
 }
 
+// ---------- alerts ----------
+function beep(){
+  try{
+    const ac=new (window.AudioContext||window.webkitAudioContext)();
+    const o=ac.createOscillator(), g=ac.createGain();
+    o.type="square"; o.frequency.value=880; g.gain.value=0.08;
+    o.connect(g); g.connect(ac.destination); o.start();
+    setTimeout(()=>{o.frequency.value=660;},180);
+    setTimeout(()=>{o.stop();ac.close();},420);
+  }catch(e){}
+}
+function alertsRender(){
+  const el=$("alerts"); el.replaceChildren();
+  const list=S.alerts||[];
+  el.hidden=!list.length;
+  for(const a of list)el.append(h("div",{class:"alert "+a.severity,onclick:()=>{tab="units";forceBody=true;render();}},(a.severity==="crit"?"⚠ ":"")+a.text));
+  const now=new Set(list.filter(a=>a.severity==="crit").map(a=>a.kind+":"+a.id));
+  let fresh=false; for(const k of now)if(!seenCrit.has(k))fresh=true;
+  seenCrit=now;
+  if(fresh&&soundOn)beep();
+}
+function soundBtn(){$("btnSound").textContent=soundOn?"Sound on":"Sound off";$("btnSound").classList.toggle("on",soundOn);}
+$("btnSound").onclick=()=>{soundOn=!soundOn;localStorage.setItem("crewaware.sound",soundOn?"1":"0");soundBtn();if(soundOn)beep();};
+
 // ---------- render ----------
 function header(){
   const s=S.site;
-  document.getElementById("siteName").textContent=s.name;
-  document.getElementById("slogan").textContent=s.slogan||"";
-  const l=document.getElementById("logo");
+  $("siteName").textContent=s.name;
+  $("slogan").textContent=s.slogan||"";
+  const l=$("logo");
   if(s.logo){l.src="/files/"+s.logo;l.hidden=false;}else l.hidden=true;
   document.title=(s.name?s.name+" · ":"")+"CrewAware";
+  $("btnEdit").hidden=!adminState.admin;
 }
 function legend(){
-  const l=document.getElementById("legend"); l.replaceChildren();
+  const l=$("legend"); l.replaceChildren();
   for(const [k,label] of STATUSES)l.append(h("span",null,h("i",{style:"background:"+SCOL[k]}),label));
   l.append(h("span",null,h("i",{style:"background:#4b5563"}),"No contact"));
   l.append(h("span",null,"Dashed ring = late"));
 }
-let focusId=null;
 function render(){
   if(!S)return;
   const ae=document.activeElement;
   // Don't rebuild forms while someone is typing in them.
-  const typing=ae&&((ae.tagName==="INPUT"&&["text","number"].includes(ae.type))||ae.tagName==="SELECT")&&document.getElementById("body").contains(ae);
-  header(); legend(); tabsRender();
+  const typing=ae&&((ae.tagName==="INPUT"&&["text","number","password"].includes(ae.type))||ae.tagName==="SELECT")&&$("body").contains(ae);
+  header(); legend(); tabsRender(); alertsRender(); soundBtn();
   if(!fitted)fit();
   drawMap();
   if(typing&&!forceBody)return;
   forceBody=false;
-  const body=document.getElementById("body");
+  const body=$("body");
   const scroll=body.scrollTop;
   body.replaceChildren();
   if(errMsg)body.append(h("div",{class:"err"},errMsg));
@@ -497,9 +816,13 @@ function render(){
 let forceBody=false;
 
 // ---------- live updates ----------
+function radioSignature(){
+  const r=S.radio||{};
+  return [r.mode,r.connected,r.name,r.error,(r.discovered||[]).map(d=>d.key).join(",")].join("|");
+}
 function connect(){
   const es=new EventSource("/api/events");
-  const dot=document.getElementById("conn");
+  const dot=$("conn");
   es.onopen=()=>dot.classList.add("on");
   es.onerror=()=>dot.classList.remove("on");
   es.onmessage=async ev=>{
@@ -507,18 +830,21 @@ function connect(){
     if(tab==="incident"&&sel&&S.incidents.some(i=>i.id===sel))await refreshCands();
     // drop selection if the incident closed elsewhere
     if(sel&&!S.incidents.some(i=>i.id===sel)){sel=null;cands=[];}
-    // setup forms only rebuild on explicit actions, so typing is not interrupted
-    if(tab==="setup"&&document.getElementById("body").children.length>0&&!errMsg){drawOnly();return;}
+    // Setup forms only rebuild on explicit actions, so typing is not interrupted. The radio list
+    // is the exception, and only rebuilds when what it shows has changed.
+    if(tab==="setup"&&$("body").children.length>0&&!errMsg){
+      const sig=radioSignature();
+      if(setupTab==="radio"&&sig!==radioSig){radioSig=sig;forceBody=true;render();return;}
+      radioSig=sig;
+      drawOnly();return;
+    }
     render();
   };
 }
-function drawOnly(){header();legend();tabsRender();if(!fitted)fit();drawMap();}
-document.getElementById("seat").value=localStorage.getItem("crewaware.seat")||"";
-document.getElementById("seat").addEventListener("input",e=>localStorage.setItem("crewaware.seat",e.target.value));
-// After an action in Setup, rebuild the form so saved values show.
-const _act=act;
-act=async function(fn){forceBody=true;await _act(fn);};
-api("/api/admin/me").then(m=>{adminState=m;}).catch(()=>{});
+function drawOnly(){header();legend();tabsRender();alertsRender();soundBtn();if(!fitted)fit();drawMap();}
+$("seat").value=localStorage.getItem("crewaware.seat")||"";
+$("seat").addEventListener("input",e=>localStorage.setItem("crewaware.seat",e.target.value));
+api("/api/admin/me").then(m=>{adminState=m;if(S){forceBody=true;render();}}).catch(()=>{});
 connect();
 </script>
 </body>

@@ -7,9 +7,8 @@ use tokio::sync::mpsc;
 
 pub type ReadFuture<'a> = Pin<Box<dyn Future<Output = Result<serde_json::Value, String>> + Send + 'a>>;
 
-/// Reads a repeater over the mesh: log in with its password, then ask for its status. The real
-/// implementation belongs to the MeshCore USB gateway and is not written yet; the simulator
-/// implements this for development.
+/// Reads a repeater over the mesh: log in with its password, then ask for its status. The radio
+/// gateway implements this for real (`bridge::GatewayReader`); the simulator has its own.
 pub trait RepeaterReader: Send + Sync {
     fn read<'a>(&'a self, repeater_id: &'a str, password: &'a str) -> ReadFuture<'a>;
 }
@@ -31,7 +30,7 @@ impl RepeaterReader for SimReader {
                 "noise_floor_dbm": -115 + (n % 8),
                 "last_rssi_dbm": -90 + (n % 20),
                 "last_snr_db": 4 + (n % 6),
-                "tx_airtime_s": 1200 + n,
+                "airtime_s": 1200 + n,
             }))
         })
     }
