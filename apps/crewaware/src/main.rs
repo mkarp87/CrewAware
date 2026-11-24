@@ -1,5 +1,6 @@
 mod api;
 mod app;
+mod bridge;
 mod reader;
 mod sim;
 
@@ -111,26 +112,62 @@ async fn main() -> Result<()> {
         tracing::warn!("pruning history failed: {e:#}");
     }
 
+    let radio_target = env("CREWAWARE_RADIO");
+    if simulate && radio_target.is_some() {
+        anyhow::bail!("set either CREWAWARE_SIM or CREWAWARE_RADIO, not both");
+    }
+
     let sim_task = simulate.then(|| {
         let secs = env("CREWAWARE_SIM_PARKED_SECS")
             .and_then(|v| v.parse().ok())
             .unwrap_or(900);
+        app.set_mode("sim");
         tokio::spawn(sim::run(app.clone(), Duration::from_secs(secs)))
     });
 
-    let poll_task = simulate.then(|| {
+    // Something has to be able to read repeaters: the simulator, or the radio gateway.
+    let mut radio_tasks = Vec::new();
+    let reader: Option<Arc<dyn reader::RepeaterReader>> = if simulate {
+        Some(Arc::new(reader::SimReader))
+    } else if let Some(target) = &radio_target {
+        let (gw, rx) = crewaware_gateway::client::Gateway::start(target, Default::default())
+            .map_err(|e| anyhow::anyhow!("CREWAWARE_RADIO: {e}"))?;
+        tracing::info!("using the radio at {target}");
+        app.set_mode("radio");
+        app.set_gateway(gw.clone());
+        radio_tasks.push(tokio::spawn(bridge::run(app.clone(), rx)));
+        let unit_poll = env("CREWAWARE_UNIT_POLL_SECS")
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(300);
+        radio_tasks.push(tokio::spawn(bridge::poll_silent(
+            app.clone(),
+            gw.clone(),
+            Duration::from_secs(unit_poll),
+        )));
+        Some(Arc::new(bridge::GatewayReader { app: app.clone(), gw }))
+    } else {
+        None
+    };
+    let poll_task = reader.map(|reader| {
         let secs = env("CREWAWARE_REPEATER_POLL_SECS")
             .and_then(|v| v.parse().ok())
             .unwrap_or(900);
         let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
         app.set_refresh_channel(tx);
-        tokio::spawn(reader::poll(
-            app.clone(),
-            Arc::new(reader::SimReader),
-            rx,
-            Duration::from_secs(secs),
-        ))
+        tokio::spawn(reader::poll(app.clone(), reader, rx, Duration::from_secs(secs)))
     });
+
+    // Notice units and repeaters that go quiet (or come back) and log it once.
+    let tick_task = {
+        let app = app.clone();
+        tokio::spawn(async move {
+            let mut iv = tokio::time::interval(Duration::from_secs(5));
+            loop {
+                iv.tick().await;
+                app.with(|e| e.tick());
+            }
+        })
+    };
 
     let bind = env("CREWAWARE_HTTP_BIND").unwrap_or_else(|| "0.0.0.0:8080".into());
     let listener = tokio::net::TcpListener::bind(&bind)
@@ -157,6 +194,10 @@ async fn main() -> Result<()> {
         t.abort();
     }
     if let Some(t) = poll_task {
+        t.abort();
+    }
+    tick_task.abort();
+    for t in radio_tasks {
         t.abort();
     }
     app.flush().await;

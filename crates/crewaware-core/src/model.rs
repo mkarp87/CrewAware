@@ -108,6 +108,9 @@ pub struct Unit {
     pub battery: i32,
     pub last_seen: Option<DateTime<Utc>>,
     pub incident_id: Option<i32>,
+    /// Public key (64 hex characters) of the MeshCore node carried by this unit, or empty.
+    #[serde(default)]
+    pub node_key: String,
     /// Monotonic reading used for ages. Never persisted, so a restart shows no contact until a
     /// new report, and a wall-clock jump cannot change contact states.
     #[serde(skip)]
@@ -129,6 +132,7 @@ impl Unit {
             battery: -1,
             last_seen: None,
             incident_id: None,
+            node_key: String::new(),
             seen_mono: None,
         }
     }
@@ -153,6 +157,9 @@ pub struct Repeater {
     pub lat: f64,
     pub lon: f64,
     pub placed: bool,
+    /// Public key (64 hex characters) of the repeater node, or empty.
+    #[serde(default)]
+    pub node_key: String,
     pub last_seen: Option<DateTime<Utc>>,
     /// Whether a login password is stored. The password itself never leaves the store.
     #[serde(default)]
@@ -180,6 +187,9 @@ pub struct LogEntry {
     pub t: DateTime<Utc>,
     pub seat: String,
     pub text: String,
+    /// The incident this entry belongs to, for the incident report.
+    #[serde(default)]
+    pub incident: Option<i32>,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -224,7 +234,78 @@ pub struct Position {
     pub unit_id: String,
     pub lat: f64,
     pub lon: f64,
-    pub speed_mph: f64,
-    /// -1 when unknown.
+    /// None when the transport cannot tell (MeshCore adverts carry no speed); the engine then works
+    /// it out from the previous report.
+    pub speed_mph: Option<f64>,
+    /// -1 when unknown; the unit keeps its last known battery.
     pub battery: i32,
+    /// How long ago the position was recorded, for reports recovered from the radio's contact list
+    /// after a restart. Zero for live reports.
+    pub age_secs: u64,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ObstacleKind {
+    /// A line that cannot be crossed (fence, wall, building edge).
+    Wall,
+    /// A wall segment dispatchers can open and close.
+    Gate,
+    /// An area that cannot be entered.
+    NoGo,
+    /// An area that can be crossed, but only at a fraction of the usual speed.
+    Slow,
+}
+
+/// Something drawn on the overlay that shapes routing. Points are overlay pixels, so obstacles
+/// stay put when the georeferencing is adjusted.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Obstacle {
+    pub id: i32,
+    pub kind: ObstacleKind,
+    pub name: String,
+    pub points: Vec<[f64; 2]>,
+    /// Gates only: true lets traffic through.
+    #[serde(default)]
+    pub open: bool,
+    /// Slow zones only: fraction of normal speed, in (0, 1].
+    #[serde(default = "one")]
+    pub factor: f64,
+}
+
+fn one() -> f64 {
+    1.0
+}
+
+/// One repeater's place in a saved site.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Placement {
+    pub id: String,
+    pub name: String,
+    #[serde(default)]
+    pub node_key: String,
+    pub lat: f64,
+    pub lon: f64,
+    pub placed: bool,
+}
+
+/// Everything that belongs to one event site: the overlay and its pinning, obstacles and where
+/// the repeaters stand. Units and settings belong to the crew, not the site.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct SiteData {
+    pub site: Site,
+    pub obstacles: Vec<Obstacle>,
+    pub repeaters: Vec<Placement>,
+}
+
+#[derive(Clone, Debug, Serialize, PartialEq)]
+pub struct Alert {
+    /// "unit" or "repeater".
+    pub kind: String,
+    pub id: String,
+    pub name: String,
+    /// "warn" or "crit".
+    pub severity: String,
+    pub text: String,
+    pub incident: Option<i32>,
 }

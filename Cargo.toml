@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["apps/crewaware", "crates/crewaware-core", "crates/crewaware-store"]
+members = ["apps/crewaware", "crates/crewaware-core", "crates/crewaware-store", "crates/crewaware-gateway"]
 
 [workspace.package]
 version = "0.2.0"

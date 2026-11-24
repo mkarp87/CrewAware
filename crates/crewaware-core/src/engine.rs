@@ -1,7 +1,9 @@
-use crate::geo::{eta_seconds, haversine_m, FEET_PER_M};
+use crate::geo::{eta_seconds, haversine_m, FEET_PER_M, MPS_PER_MPH};
 use crate::model::*;
+use crate::route::RouteField;
 use chrono::{DateTime, Utc};
 use serde::Serialize;
+use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
 #[derive(Debug, thiserror::Error, PartialEq)]
@@ -26,6 +28,10 @@ pub enum Change {
     Incident(Incident),
     Log(LogEntry),
     Site(Site),
+    /// The whole obstacle list, replacing what was stored.
+    Obstacles(Vec<Obstacle>),
+    RemoveUnit(String),
+    RemoveRepeater(String),
     Group(Group),
     Settings(Settings),
     Position {
@@ -48,6 +54,7 @@ pub struct State {
     pub repeaters: Vec<Repeater>,
     pub incidents: Vec<Incident>,
     pub log: Vec<LogEntry>,
+    pub obstacles: Vec<Obstacle>,
     pub next_incident: i32,
 }
 
@@ -59,8 +66,12 @@ pub struct Engine {
     pub(crate) repeaters: Vec<Repeater>,
     pub(crate) incidents: Vec<Incident>,
     pub(crate) log: Vec<LogEntry>,
+    pub(crate) obstacles: Vec<Obstacle>,
     next_incident: i32,
     pending: Vec<Change>,
+    /// Last contact state seen by `tick`, per unit or repeater, and whether it was ever in contact
+    /// since start. Used to log transitions once.
+    contact_seen: HashMap<String, (Contact, bool)>,
 }
 
 #[derive(Serialize)]
@@ -90,6 +101,10 @@ pub struct Snapshot {
     pub repeaters: Vec<RepeaterView>,
     pub incidents: Vec<Incident>,
     pub log: Vec<LogEntry>,
+    pub obstacles: Vec<Obstacle>,
+    pub alerts: Vec<Alert>,
+    /// The most recently closed incidents, newest first, so their reports can be opened.
+    pub closed: Vec<Incident>,
 }
 
 #[derive(Serialize, Debug, Clone)]
@@ -97,16 +112,31 @@ pub struct Candidate {
     pub unit_id: String,
     pub name: String,
     pub group: String,
+    /// Distance to travel: along the route when one was found, otherwise in a straight line.
     pub dist_m: f64,
     pub dist_ft: f64,
+    /// Straight-line distance, for comparison with the route.
+    pub straight_m: f64,
     /// None when the group has no usable speed.
     pub eta_sec: Option<f64>,
     pub contact: Contact,
     pub age_sec: f64,
+    /// True when `dist_m` and `eta_sec` come from a route around obstacles.
+    pub routed: bool,
+    /// The route in overlay pixels, from the unit to the incident.
+    pub path_px: Option<Vec<[f64; 2]>>,
 }
 
-fn age_of(t: Option<Instant>) -> Duration {
-    t.map(|i| i.elapsed()).unwrap_or_default()
+/// How long ago a node was last heard. After a restart only the stored wall-clock time is left
+/// (contact itself is not resurrected), and a node never heard counts as a day.
+fn age_of(t: Option<Instant>, wall: Option<DateTime<Utc>>) -> Duration {
+    if let Some(i) = t {
+        return i.elapsed();
+    }
+    match wall {
+        Some(w) => (Utc::now() - w).to_std().unwrap_or_default(),
+        None => Duration::from_secs(86_400),
+    }
 }
 
 impl Engine {
@@ -134,8 +164,10 @@ impl Engine {
             repeaters: s.repeaters,
             incidents: s.incidents,
             log: s.log,
+            obstacles: s.obstacles,
             next_incident: s.next_incident.max(1),
             pending: Vec::new(),
+            contact_seen: HashMap::new(),
         }
     }
 
@@ -145,10 +177,15 @@ impl Engine {
     }
 
     fn logf(&mut self, seat: &str, text: String) {
+        self.logi(seat, text, None);
+    }
+
+    fn logi(&mut self, seat: &str, text: String, incident: Option<i32>) {
         let e = LogEntry {
             t: Utc::now(),
             seat: seat.into(),
             text,
+            incident,
         };
         self.log.push(e.clone());
         if self.log.len() > 2000 {
@@ -172,8 +209,24 @@ impl Engine {
     }
 
     fn contact_of(&self, u: &Unit) -> (Contact, Duration) {
-        let age = age_of(u.seen_mono);
+        let age = age_of(u.seen_mono, u.last_seen);
         (contact_state(&self.settings, u.seen_mono.is_some(), u.moving, age), age)
+    }
+
+    pub fn incident(&self, id: i32) -> Option<Incident> {
+        self.incidents.iter().find(|i| i.id == id).cloned()
+    }
+
+    pub fn all_incidents(&self) -> Vec<Incident> {
+        self.incidents.clone()
+    }
+
+    pub fn unit_name(&self, id: &str) -> String {
+        self.units
+            .iter()
+            .find(|u| u.id == id)
+            .map(|u| u.name.clone())
+            .unwrap_or_else(|| id.to_string())
     }
 
     pub fn site(&self) -> &Site {
@@ -185,20 +238,52 @@ impl Engine {
 
     // ---- reports from transports ----
 
-    /// Records a position report. Unknown unit ids are ignored.
+    /// Records a position report. Unknown unit ids are ignored, and so is a report older than the
+    /// one already held (the radio replays its contact list after a reconnect).
     pub fn report_position(&mut self, p: Position) {
         let Some(i) = self.unit_idx(&p.unit_id) else { return };
+        if !(p.lat.is_finite() && p.lon.is_finite() && p.lat.abs() <= 90.0 && p.lon.abs() <= 180.0) {
+            return;
+        }
         let min = self.settings.moving_min_mph;
+        let age = Duration::from_secs(p.age_secs);
         let now = Utc::now();
+        let at_mono = Instant::now().checked_sub(age).unwrap_or_else(Instant::now);
+        let at = now - chrono::Duration::seconds(p.age_secs.min(i64::MAX as u64 / 4) as i64);
         let u = &mut self.units[i];
+        let prev = u.seen_mono.filter(|_| u.has_pos);
+        if let Some(pm) = prev {
+            if at_mono < pm {
+                return;
+            }
+        }
+        // Speed: as reported, else from how far the unit moved since its previous report. GPS
+        // wander of a few metres is not movement, and very close reports say nothing about speed.
+        let speed = match (p.speed_mph, prev) {
+            (Some(s), _) => s,
+            (None, Some(pm)) => {
+                let dt = at_mono.duration_since(pm).as_secs_f64();
+                let d = haversine_m(u.lat, u.lon, p.lat, p.lon);
+                if d < 8.0 {
+                    0.0
+                } else if dt >= 10.0 {
+                    d / dt / MPS_PER_MPH
+                } else {
+                    u.speed_mph
+                }
+            }
+            (None, None) => 0.0,
+        };
         u.has_pos = true;
         u.lat = p.lat;
         u.lon = p.lon;
-        u.speed_mph = p.speed_mph;
-        u.moving = p.speed_mph >= min;
-        u.battery = p.battery;
-        u.last_seen = Some(now);
-        u.seen_mono = Some(Instant::now());
+        u.speed_mph = speed;
+        u.moving = speed >= min;
+        if p.battery >= 0 {
+            u.battery = p.battery;
+        }
+        u.last_seen = Some(at);
+        u.seen_mono = Some(at_mono);
         let u = u.clone();
         self.pending.push(Change::Position {
             unit_id: u.id.clone(),
@@ -206,18 +291,65 @@ impl Engine {
             lon: u.lon,
             speed_mph: u.speed_mph,
             battery: u.battery,
-            at: now,
+            at,
         });
         self.pending.push(Change::Unit(u));
     }
 
+    /// Records a battery level learned some other way than a position report, and counts as a
+    /// check-in because the unit answered.
+    pub fn report_battery(&mut self, unit_id: &str, percent: i32) {
+        let Some(i) = self.unit_idx(unit_id) else { return };
+        let u = &mut self.units[i];
+        u.battery = percent.clamp(0, 100);
+        u.last_seen = Some(Utc::now());
+        u.seen_mono = Some(Instant::now());
+        self.pending.push(Change::Unit(u.clone()));
+    }
+
     pub fn report_repeater(&mut self, id: &str) {
+        self.report_repeater_aged(id, 0);
+    }
+
+    /// Records that a repeater was heard `age_secs` ago. Older than what is already known is ignored.
+    pub fn report_repeater_aged(&mut self, id: &str, age_secs: u64) {
         if let Some(r) = self.repeaters.iter_mut().find(|r| r.id == id) {
-            r.last_seen = Some(Utc::now());
-            r.seen_mono = Some(Instant::now());
+            let at_mono = Instant::now()
+                .checked_sub(Duration::from_secs(age_secs))
+                .unwrap_or_else(Instant::now);
+            if r.seen_mono.is_some_and(|m| at_mono < m) {
+                return;
+            }
+            r.last_seen = Some(Utc::now() - chrono::Duration::seconds(age_secs.min(1 << 40) as i64));
+            r.seen_mono = Some(at_mono);
             let r = r.clone();
             self.pending.push(Change::Repeater(r));
         }
+    }
+
+    /// Records that a unit was heard without a position (an advert from a tracker with no GPS fix).
+    pub fn report_checkin(&mut self, unit_id: &str, age_secs: u64) {
+        let Some(i) = self.unit_idx(unit_id) else { return };
+        let at_mono = Instant::now()
+            .checked_sub(Duration::from_secs(age_secs))
+            .unwrap_or_else(Instant::now);
+        let u = &mut self.units[i];
+        if u.seen_mono.is_some_and(|m| at_mono < m) {
+            return;
+        }
+        u.last_seen = Some(Utc::now() - chrono::Duration::seconds(age_secs.min(1 << 40) as i64));
+        u.seen_mono = Some(at_mono);
+        self.pending.push(Change::Unit(u.clone()));
+    }
+
+    /// Units with a radio key that have gone quiet and are worth asking directly.
+    pub fn silent_units(&self) -> Vec<(String, String)> {
+        self.units
+            .iter()
+            .filter(|u| !u.node_key.is_empty() && u.status != Status::OffDuty && u.seen_mono.is_some())
+            .filter(|u| self.contact_of(u).0 != Contact::Normal)
+            .map(|u| (u.id.clone(), u.node_key.clone()))
+            .collect()
     }
 
     /// Records the outcome of reading a repeater. A successful read proves the repeater is alive,
@@ -299,7 +431,7 @@ impl Engine {
             .repeaters
             .iter()
             .map(|r| {
-                let age = age_of(r.seen_mono);
+                let age = age_of(r.seen_mono, r.last_seen);
                 // Repeaters check in on the slow cadence.
                 let contact = contact_state(&self.settings, r.seen_mono.is_some(), false, age);
                 RepeaterView {
@@ -318,37 +450,187 @@ impl Engine {
             repeaters,
             incidents: self.incidents.iter().filter(|i| i.open).cloned().collect(),
             log: self.log.iter().rev().take(100).cloned().collect(),
+            obstacles: self.obstacles.clone(),
+            alerts: self.alerts(),
+            closed: self
+                .incidents
+                .iter()
+                .rev()
+                .filter(|i| !i.open)
+                .take(20)
+                .cloned()
+                .collect(),
         }
     }
 
-    /// Available units ranked by straight-line distance. Units with no contact are included
-    /// but sorted after live ones, so command sees them without being steered toward a unit
-    /// that may be gone.
+    /// Things command should know about right now: units and repeaters that have gone quiet.
+    /// A unit working an incident that stops reporting is the serious case.
+    pub fn alerts(&self) -> Vec<Alert> {
+        let mut out = Vec::new();
+        for u in &self.units {
+            if u.status == Status::OffDuty || u.seen_mono.is_none() {
+                continue;
+            }
+            let (c, age) = self.contact_of(u);
+            let mins = (age.as_secs_f64() / 60.0).round() as i64;
+            let on_job = matches!(u.status, Status::Dispatched | Status::OnScene);
+            let (sev, text) = match c {
+                Contact::Normal => continue,
+                Contact::Late => ("warn", format!("{} is late: no report for {mins} min", u.name)),
+                Contact::NoContact => (
+                    if on_job { "crit" } else { "warn" },
+                    format!("{} has no contact: last report {mins} min ago", u.name),
+                ),
+            };
+            out.push(Alert {
+                kind: "unit".into(),
+                id: u.id.clone(),
+                name: u.name.clone(),
+                severity: sev.into(),
+                text,
+                incident: u.incident_id,
+            });
+        }
+        // Repeaters are only judged when we read them ourselves: their own adverts can be hours apart.
+        for r in &self.repeaters {
+            if !r.placed || !r.has_credentials || r.seen_mono.is_none() {
+                continue;
+            }
+            let age = age_of(r.seen_mono, r.last_seen);
+            if contact_state(&self.settings, true, false, age) == Contact::NoContact {
+                out.push(Alert {
+                    kind: "repeater".into(),
+                    id: r.id.clone(),
+                    name: r.name.clone(),
+                    severity: "warn".into(),
+                    text: format!(
+                        "{} has no contact: last heard {} min ago",
+                        r.name,
+                        (age.as_secs_f64() / 60.0).round() as i64
+                    ),
+                    incident: None,
+                });
+            }
+        }
+        out
+    }
+
+    /// Notices contact changes and writes them to the activity log once each. Called every few
+    /// seconds. Nothing is logged for something that has not been heard from since start, so a
+    /// restart does not log every unit as lost.
+    pub fn tick(&mut self) {
+        let mut lines: Vec<(String, Option<i32>)> = Vec::new();
+        let mut seen = std::mem::take(&mut self.contact_seen);
+        for u in &self.units {
+            let (c, age) = self.contact_of(u);
+            let mins = (age.as_secs_f64() / 60.0).round() as i64;
+            let entry = seen.entry(format!("u:{}", u.id)).or_insert((c, c == Contact::Normal));
+            let (prev, had) = *entry;
+            if prev != c {
+                let text = match c {
+                    Contact::Late if had => Some(format!("{} is late (no report for {mins} min)", u.name)),
+                    Contact::NoContact if had => {
+                        let job = if u.incident_id.is_some() && matches!(u.status, Status::Dispatched | Status::OnScene)
+                        {
+                            format!(" while {}", u.status.as_str().replace('_', " "))
+                        } else {
+                            String::new()
+                        };
+                        Some(format!("{}: no contact{job} (last report {mins} min ago)", u.name))
+                    }
+                    Contact::Normal if had && prev != Contact::Normal => Some(format!("{} is back in contact", u.name)),
+                    _ => None,
+                };
+                if let Some(t) = text {
+                    lines.push((t, u.incident_id));
+                }
+            }
+            *entry = (c, had || c == Contact::Normal);
+        }
+        for r in &self.repeaters {
+            if !r.placed || !r.has_credentials {
+                continue;
+            }
+            let age = age_of(r.seen_mono, r.last_seen);
+            let c = contact_state(&self.settings, r.seen_mono.is_some(), false, age);
+            let mins = (age.as_secs_f64() / 60.0).round() as i64;
+            let entry = seen.entry(format!("r:{}", r.id)).or_insert((c, c == Contact::Normal));
+            let (prev, had) = *entry;
+            if prev != c && had {
+                match c {
+                    Contact::NoContact => {
+                        lines.push((format!("{} has no contact (last heard {mins} min ago)", r.name), None))
+                    }
+                    Contact::Normal => lines.push((format!("{} is back in contact", r.name), None)),
+                    Contact::Late => {}
+                }
+            }
+            *entry = (c, had || c == Contact::Normal);
+        }
+        self.contact_seen = seen;
+        for (t, inc) in lines {
+            self.logi("system", t, inc);
+        }
+    }
+
+    /// Available units ranked by how soon they would arrive. With obstacles drawn, arrival is
+    /// worked out along a route around them; without, in a straight line. Units with no contact
+    /// are included but sorted after live ones, so command sees them without being steered toward
+    /// a unit that may be gone.
     pub fn nearest(&self, lat: f64, lon: f64) -> Vec<Candidate> {
+        let field = if self.obstacles.is_empty() {
+            None
+        } else {
+            self.site
+                .to_pixel(lat, lon)
+                .and_then(|g| RouteField::build(&self.site, &self.obstacles, g))
+        };
         let mut out: Vec<Candidate> = self
             .units
             .iter()
             .filter(|u| u.status == Status::Available && u.has_pos)
             .map(|u| {
                 let (contact, age) = self.contact_of(u);
-                let d = haversine_m(lat, lon, u.lat, u.lon);
+                let straight = haversine_m(lat, lon, u.lat, u.lon);
                 let g = self.group_of(&u.group_id);
-                let eta = eta_seconds(d, &g);
+                let speed = g.max_mph * g.adjust * MPS_PER_MPH;
+                let route = field.as_ref().and_then(|f| {
+                    let (px, py) = self.site.to_pixel(u.lat, u.lon)?;
+                    f.route_from(px, py)
+                });
+                let (dist, eta, routed, path) = match route {
+                    Some(r) => (r.dist_m, (speed > 0.0).then(|| r.eff_m / speed), true, Some(r.path_px)),
+                    None => {
+                        let e = eta_seconds(straight, &g);
+                        (straight, e.is_finite().then_some(e), false, None)
+                    }
+                };
                 Candidate {
                     unit_id: u.id.clone(),
                     name: u.name.clone(),
                     group: g.name,
-                    dist_m: d,
-                    dist_ft: d * FEET_PER_M,
-                    eta_sec: eta.is_finite().then_some(eta),
+                    dist_m: dist,
+                    dist_ft: dist * FEET_PER_M,
+                    straight_m: straight,
+                    eta_sec: eta,
                     contact,
                     age_sec: age.as_secs_f64(),
+                    routed,
+                    path_px: path,
                 }
             })
             .collect();
+        // A unit that has no route at all (walled off) ranks below those that do, but above ones
+        // with no contact only if it is in contact: the unreachable flag is `routed == false`
+        // while obstacles exist.
+        let have_field = field.is_some();
         out.sort_by(|a, b| {
-            let (ga, gb) = (a.contact == Contact::NoContact, b.contact == Contact::NoContact);
-            ga.cmp(&gb).then(a.dist_m.total_cmp(&b.dist_m))
+            let dead = |c: &Candidate| (c.contact == Contact::NoContact, have_field && !c.routed);
+            let key = |c: &Candidate| c.eta_sec.unwrap_or(f64::INFINITY);
+            dead(a)
+                .cmp(&dead(b))
+                .then(key(a).total_cmp(&key(b)))
+                .then(a.dist_m.total_cmp(&b.dist_m))
         });
         out
     }
@@ -409,7 +691,7 @@ impl Engine {
         };
         self.incidents.push(inc.clone());
         self.pending.push(Change::Incident(inc.clone()));
-        self.logf(seat, format!("Opened {}", inc.label));
+        self.logi(seat, format!("Opened {}", inc.label), Some(inc.id));
         inc
     }
 
@@ -450,7 +732,7 @@ impl Engine {
             let name = self.units[ui].name.clone();
             self.incidents[ii].units.push(uid);
             self.pending.push(Change::Unit(self.units[ui].clone()));
-            self.logf(seat, format!("Dispatched {name} to {label}"));
+            self.logi(seat, format!("Dispatched {name} to {label}"), Some(incident_id));
         }
         self.pending.push(Change::Incident(self.incidents[ii].clone()));
         Ok(())
@@ -469,7 +751,7 @@ impl Engine {
         self.units[ui].status = Status::OnScene;
         let text = format!("{} on scene at {}", self.units[ui].name, self.incidents[ii].label);
         self.pending.push(Change::Unit(self.units[ui].clone()));
-        self.logf(seat, text);
+        self.logi(seat, text, Some(incident_id));
         Ok(())
     }
 
@@ -493,7 +775,7 @@ impl Engine {
         self.incidents[ii].closed = Some(Utc::now());
         let label = self.incidents[ii].label.clone();
         self.pending.push(Change::Incident(self.incidents[ii].clone()));
-        self.logf(seat, format!("Closed {label}"));
+        self.logi(seat, format!("Closed {label}"), Some(incident_id));
         Ok(())
     }
 
@@ -508,6 +790,32 @@ impl Engine {
         let u = Unit::new(id, name, group_id);
         self.units.push(u.clone());
         self.pending.push(Change::Unit(u));
+        Ok(())
+    }
+
+    /// Removes a unit from the crew. A unit working an incident has to be released first.
+    pub fn remove_unit(&mut self, unit_id: &str, seat: &str) -> Result<(), EngineError> {
+        let ui = self.unit_idx(unit_id).ok_or(EngineError::NotFound)?;
+        if self.units[ui].incident_id.is_some() {
+            return Err(EngineError::Conflict("release the unit from its incident first".into()));
+        }
+        let u = self.units.remove(ui);
+        self.contact_seen.remove(&format!("u:{unit_id}"));
+        self.pending.push(Change::RemoveUnit(unit_id.into()));
+        self.logf(seat, format!("Removed unit {}", u.name));
+        Ok(())
+    }
+
+    pub fn remove_repeater(&mut self, repeater_id: &str, seat: &str) -> Result<(), EngineError> {
+        let ri = self
+            .repeaters
+            .iter()
+            .position(|r| r.id == repeater_id)
+            .ok_or(EngineError::NotFound)?;
+        let r = self.repeaters.remove(ri);
+        self.contact_seen.remove(&format!("r:{repeater_id}"));
+        self.pending.push(Change::RemoveRepeater(repeater_id.into()));
+        self.logf(seat, format!("Removed repeater {}", r.name));
         Ok(())
     }
 
@@ -553,6 +861,7 @@ impl Engine {
                     lat,
                     lon,
                     placed,
+                    node_key: String::new(),
                     last_seen: None,
                     has_credentials: false,
                     reading: None,
@@ -584,6 +893,319 @@ impl Engine {
         }
         self.settings = s.clone();
         self.pending.push(Change::Settings(s));
+        Ok(())
+    }
+
+    // ---- radio nodes ----
+
+    fn clean_key(key: &str) -> Result<String, EngineError> {
+        let k = key.trim().to_ascii_lowercase();
+        if k.is_empty() {
+            return Ok(k);
+        }
+        if k.len() != 64 || !k.bytes().all(|b| b.is_ascii_hexdigit()) {
+            return Err(EngineError::Bad("a node key is 64 hex characters".into()));
+        }
+        Ok(k)
+    }
+
+    pub fn unit_for_key(&self, key: &str) -> Option<String> {
+        self.units
+            .iter()
+            .find(|u| !u.node_key.is_empty() && u.node_key == key)
+            .map(|u| u.id.clone())
+    }
+
+    pub fn repeater_for_key(&self, key: &str) -> Option<String> {
+        self.repeaters
+            .iter()
+            .find(|r| !r.node_key.is_empty() && r.node_key == key)
+            .map(|r| r.id.clone())
+    }
+
+    /// Radio key of a repeater, for the reader.
+    pub fn repeater_key(&self, id: &str) -> Option<String> {
+        self.repeaters.iter().find(|r| r.id == id).map(|r| r.node_key.clone())
+    }
+
+    /// Units that have a radio key, for polling ones that go quiet.
+    pub fn unit_keys(&self) -> Vec<(String, String)> {
+        self.units
+            .iter()
+            .filter(|u| !u.node_key.is_empty())
+            .map(|u| (u.id.clone(), u.node_key.clone()))
+            .collect()
+    }
+
+    fn key_free(&self, key: &str, except_unit: Option<&str>, except_rep: Option<&str>) -> bool {
+        key.is_empty()
+            || (!self
+                .units
+                .iter()
+                .any(|u| u.node_key == key && Some(u.id.as_str()) != except_unit)
+                && !self
+                    .repeaters
+                    .iter()
+                    .any(|r| r.node_key == key && Some(r.id.as_str()) != except_rep))
+    }
+
+    pub fn set_unit_key(&mut self, unit_id: &str, key: &str) -> Result<(), EngineError> {
+        let key = Self::clean_key(key)?;
+        let ui = self.unit_idx(unit_id).ok_or(EngineError::NotFound)?;
+        if !self.key_free(&key, Some(unit_id), None) {
+            return Err(EngineError::Conflict("that node is already assigned".into()));
+        }
+        self.units[ui].node_key = key;
+        self.pending.push(Change::Unit(self.units[ui].clone()));
+        Ok(())
+    }
+
+    pub fn set_repeater_key(&mut self, repeater_id: &str, key: &str) -> Result<(), EngineError> {
+        let key = Self::clean_key(key)?;
+        let ri = self
+            .repeaters
+            .iter()
+            .position(|r| r.id == repeater_id)
+            .ok_or(EngineError::NotFound)?;
+        if !self.key_free(&key, None, Some(repeater_id)) {
+            return Err(EngineError::Conflict("that node is already assigned".into()));
+        }
+        self.repeaters[ri].node_key = key;
+        self.pending.push(Change::Repeater(self.repeaters[ri].clone()));
+        Ok(())
+    }
+
+    fn fresh_id(&self, name: &str, taken: impl Fn(&str) -> bool) -> String {
+        let base: String = name
+            .to_ascii_lowercase()
+            .chars()
+            .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
+            .collect::<String>()
+            .split('-')
+            .filter(|p| !p.is_empty())
+            .collect::<Vec<_>>()
+            .join("-");
+        let base = if base.is_empty() { "node".to_string() } else { base };
+        let base: String = base.chars().take(40).collect();
+        if !taken(&base) {
+            return base;
+        }
+        (2..).map(|n| format!("{base}-{n}")).find(|c| !taken(c)).unwrap()
+    }
+
+    /// Creates a unit for a radio node found on the mesh. Returns the new unit id.
+    pub fn adopt_unit(&mut self, key: &str, name: &str, group_id: &str) -> Result<String, EngineError> {
+        let key = Self::clean_key(key)?;
+        if key.is_empty() {
+            return Err(EngineError::Bad("node key required".into()));
+        }
+        if !self.key_free(&key, None, None) {
+            return Err(EngineError::Conflict("that node is already assigned".into()));
+        }
+        let id = self.fresh_id(name, |c| self.unit_idx(c).is_some());
+        self.add_unit(&id, name, group_id)?;
+        self.set_unit_key(&id, &key)?;
+        Ok(id)
+    }
+
+    /// Creates a repeater for a radio node found on the mesh. Returns the new repeater id.
+    pub fn adopt_repeater(&mut self, key: &str, name: &str) -> Result<String, EngineError> {
+        let key = Self::clean_key(key)?;
+        if key.is_empty() {
+            return Err(EngineError::Bad("node key required".into()));
+        }
+        if !self.key_free(&key, None, None) {
+            return Err(EngineError::Conflict("that node is already assigned".into()));
+        }
+        let id = self.fresh_id(name, |c| self.repeater_exists(c));
+        self.set_repeater(&id, name, 0.0, 0.0, false)?;
+        self.set_repeater_key(&id, &key)?;
+        Ok(id)
+    }
+
+    // ---- obstacles ----
+
+    fn validate_obstacle(&self, o: &Obstacle) -> Result<(), EngineError> {
+        let need = match o.kind {
+            ObstacleKind::Wall | ObstacleKind::Gate => 2,
+            ObstacleKind::NoGo | ObstacleKind::Slow => 3,
+        };
+        if o.points.len() < need || o.points.len() > 200 {
+            return Err(EngineError::Bad(
+                format!("a {:?} needs {need} to 200 points", o.kind).to_lowercase(),
+            ));
+        }
+        let (w, h) = (self.site.img_w, self.site.img_h);
+        let ok = o.points.iter().all(|p| {
+            p[0].is_finite()
+                && p[1].is_finite()
+                && p[0] >= -w * 0.1
+                && p[0] <= w * 1.1
+                && p[1] >= -h * 0.1
+                && p[1] <= h * 1.1
+        });
+        if !ok {
+            return Err(EngineError::Bad("points must lie on the overlay".into()));
+        }
+        if o.kind == ObstacleKind::Slow && !(o.factor > 0.0 && o.factor <= 1.0) {
+            return Err(EngineError::Bad(
+                "slow zone speed must be above 0 and at most 100%".into(),
+            ));
+        }
+        if o.name.chars().count() > 60 {
+            return Err(EngineError::Bad("name too long".into()));
+        }
+        Ok(())
+    }
+
+    pub fn obstacles(&self) -> &[Obstacle] {
+        &self.obstacles
+    }
+
+    /// Adds an obstacle (id 0) or replaces one. Returns it with its id.
+    pub fn set_obstacle(&mut self, mut o: Obstacle, seat: &str) -> Result<Obstacle, EngineError> {
+        self.validate_obstacle(&o)?;
+        o.name = o.name.trim().to_string();
+        if o.kind != ObstacleKind::Slow {
+            o.factor = 1.0;
+        }
+        if o.kind != ObstacleKind::Gate {
+            o.open = false;
+        }
+        if o.id == 0 {
+            if self.obstacles.len() >= 500 {
+                return Err(EngineError::Bad("too many obstacles".into()));
+            }
+            o.id = self.obstacles.iter().map(|x| x.id).max().unwrap_or(0) + 1;
+            self.obstacles.push(o.clone());
+            let what = if o.name.is_empty() {
+                format!("{:?}", o.kind).to_lowercase()
+            } else {
+                o.name.clone()
+            };
+            self.logf(seat, format!("Added obstacle: {what}"));
+        } else {
+            let x = self
+                .obstacles
+                .iter_mut()
+                .find(|x| x.id == o.id)
+                .ok_or(EngineError::NotFound)?;
+            *x = o.clone();
+        }
+        self.pending.push(Change::Obstacles(self.obstacles.clone()));
+        Ok(o)
+    }
+
+    pub fn delete_obstacle(&mut self, id: i32, seat: &str) -> Result<(), EngineError> {
+        let i = self
+            .obstacles
+            .iter()
+            .position(|x| x.id == id)
+            .ok_or(EngineError::NotFound)?;
+        let o = self.obstacles.remove(i);
+        self.pending.push(Change::Obstacles(self.obstacles.clone()));
+        let what = if o.name.is_empty() {
+            format!("{:?}", o.kind).to_lowercase()
+        } else {
+            o.name
+        };
+        self.logf(seat, format!("Removed obstacle: {what}"));
+        Ok(())
+    }
+
+    /// Opens or closes a gate. Dispatchers do this as conditions change during an event.
+    pub fn set_gate(&mut self, id: i32, open: bool, seat: &str) -> Result<(), EngineError> {
+        let o = self
+            .obstacles
+            .iter_mut()
+            .find(|x| x.id == id)
+            .ok_or(EngineError::NotFound)?;
+        if o.kind != ObstacleKind::Gate {
+            return Err(EngineError::Bad("not a gate".into()));
+        }
+        if o.open == open {
+            return Ok(());
+        }
+        o.open = open;
+        let name = if o.name.is_empty() {
+            format!("Gate {}", o.id)
+        } else {
+            o.name.clone()
+        };
+        self.pending.push(Change::Obstacles(self.obstacles.clone()));
+        self.logf(seat, format!("{name} {}", if open { "opened" } else { "closed" }));
+        Ok(())
+    }
+
+    // ---- site profiles ----
+
+    /// The current site, its obstacles and where its repeaters stand, for saving or exporting.
+    pub fn export_site(&self) -> SiteData {
+        SiteData {
+            site: self.site.clone(),
+            obstacles: self.obstacles.clone(),
+            repeaters: self
+                .repeaters
+                .iter()
+                .map(|r| Placement {
+                    id: r.id.clone(),
+                    name: r.name.clone(),
+                    node_key: r.node_key.clone(),
+                    lat: r.lat,
+                    lon: r.lon,
+                    placed: r.placed,
+                })
+                .collect(),
+        }
+    }
+
+    /// Makes a saved site the active one. Refused while an incident is open, because incidents
+    /// are located on the current overlay.
+    pub fn activate_site(&mut self, data: SiteData, seat: &str) -> Result<(), EngineError> {
+        if self.incidents.iter().any(|i| i.open) {
+            return Err(EngineError::Conflict(
+                "close the open incidents before switching sites".into(),
+            ));
+        }
+        if data.site.slogan.chars().count() > 60 {
+            return Err(EngineError::Bad("slogan too long".into()));
+        }
+        let name = data.site.name.clone();
+        self.site = data.site;
+        self.pending.push(Change::Site(self.site.clone()));
+        let mut obstacles = Vec::new();
+        for (n, mut o) in data.obstacles.into_iter().enumerate() {
+            o.id = n as i32 + 1;
+            self.validate_obstacle(&o)?;
+            obstacles.push(o);
+        }
+        self.obstacles = obstacles;
+        self.pending.push(Change::Obstacles(self.obstacles.clone()));
+        // Repeaters belong to the crew's kit and keep their passwords; only where they stand changes.
+        let mut touched = Vec::new();
+        for r in &mut self.repeaters {
+            match data.repeaters.iter().find(|p| p.id == r.id) {
+                Some(p) => {
+                    r.lat = p.lat;
+                    r.lon = p.lon;
+                    r.placed = p.placed;
+                }
+                None => r.placed = false,
+            }
+            touched.push(r.clone());
+        }
+        for r in touched {
+            self.pending.push(Change::Repeater(r));
+        }
+        for p in data.repeaters {
+            if !self.repeater_exists(&p.id) {
+                self.set_repeater(&p.id, &p.name, p.lat, p.lon, p.placed)?;
+                if !p.node_key.is_empty() && self.key_free(&p.node_key, None, None) {
+                    let _ = self.set_repeater_key(&p.id, &p.node_key);
+                }
+            }
+        }
+        self.logf(seat, format!("Switched to site {name}"));
         Ok(())
     }
 
@@ -688,7 +1310,8 @@ mod tests {
             unit_id: id.into(),
             lat,
             lon,
-            speed_mph: mph,
+            speed_mph: Some(mph),
+            age_secs: 0,
             battery: 50,
         }
     }
@@ -914,5 +1537,289 @@ mod tests {
         };
         assert!(e.set_settings(bad).is_err());
         assert!(e.set_settings(Settings::default()).is_ok());
+    }
+
+    fn at_px(e: &Engine, px: f64, py: f64) -> (f64, f64) {
+        e.site.to_lat_lon(px, py).unwrap()
+    }
+
+    fn pos_at(id: &str, ll: (f64, f64), speed: Option<f64>, age: u64) -> Position {
+        Position {
+            unit_id: id.into(),
+            lat: ll.0,
+            lon: ll.1,
+            speed_mph: speed,
+            battery: -1,
+            age_secs: age,
+        }
+    }
+
+    fn wall(points: &[[f64; 2]]) -> Obstacle {
+        Obstacle {
+            id: 0,
+            kind: ObstacleKind::Wall,
+            name: "Fence".into(),
+            points: points.to_vec(),
+            open: false,
+            factor: 1.0,
+        }
+    }
+
+    #[test]
+    fn obstacles_change_who_is_nearest() {
+        let mut e = eng();
+        let inc = at_px(&e, 800.0, 350.0);
+        e.report_position(pos_at("a", at_px(&e, 600.0, 350.0), Some(0.0), 0));
+        e.report_position(pos_at("b", at_px(&e, 800.0, 600.0), Some(0.0), 0));
+        let plain = e.nearest(inc.0, inc.1);
+        assert_eq!(plain[0].unit_id, "a");
+        assert!(!plain[0].routed && plain[0].path_px.is_none());
+
+        e.set_obstacle(wall(&[[700.0, 0.0], [700.0, 500.0]]), "t").unwrap();
+        let routed = e.nearest(inc.0, inc.1);
+        assert_eq!(routed[0].unit_id, "b", "the fence puts a behind b: {routed:?}");
+        let a = routed.iter().find(|c| c.unit_id == "a").unwrap();
+        assert!(a.routed && a.dist_m > a.straight_m * 1.5, "{a:?}");
+        let path = a.path_px.as_ref().unwrap();
+        assert!(
+            path.iter().any(|p| p[1] > 495.0),
+            "route goes round the fence end: {path:?}"
+        );
+        // ETA follows the longer route.
+        let (eta_a, eta_b) = (a.eta_sec.unwrap(), routed[0].eta_sec.unwrap());
+        assert!(eta_a > eta_b);
+
+        // Closing a gate in the fence is a dispatcher action and shows in the log.
+        let g = e
+            .set_obstacle(
+                Obstacle {
+                    id: 0,
+                    kind: ObstacleKind::Gate,
+                    name: "Gate 1".into(),
+                    points: vec![[700.0, 500.0], [700.0, 700.0]],
+                    open: false,
+                    factor: 1.0,
+                },
+                "t",
+            )
+            .unwrap();
+        assert!(!e.nearest(inc.0, inc.1)[1].routed || e.nearest(inc.0, inc.1)[1].path_px.is_some());
+        e.set_gate(g.id, true, "seat 2").unwrap();
+        assert!(e.log.last().unwrap().text.contains("Gate 1 opened"));
+        assert!(e.set_gate(1, true, "x").is_err(), "a fence is not a gate");
+    }
+
+    #[test]
+    fn a_walled_off_unit_ranks_below_reachable_ones() {
+        let mut e = eng();
+        let inc = at_px(&e, 800.0, 350.0);
+        e.report_position(pos_at("a", at_px(&e, 100.0, 350.0), Some(0.0), 0));
+        e.report_position(pos_at("b", at_px(&e, 500.0, 350.0), Some(0.0), 0));
+        // A full-height wall between a and b.
+        e.set_obstacle(wall(&[[300.0, -10.0], [300.0, 710.0]]), "t").unwrap();
+        let got = e.nearest(inc.0, inc.1);
+        assert_eq!(got.iter().map(|c| c.unit_id.as_str()).collect::<Vec<_>>(), ["b", "a"]);
+        assert!(got[0].routed && !got[1].routed);
+        assert_eq!(got[1].dist_m, got[1].straight_m, "falls back to straight line");
+    }
+
+    #[test]
+    fn obstacle_validation() {
+        let mut e = eng();
+        assert!(e.set_obstacle(wall(&[[0.0, 0.0]]), "t").is_err());
+        assert!(e.set_obstacle(wall(&[[0.0, 0.0], [5000.0, 0.0]]), "t").is_err());
+        assert!(e.set_obstacle(wall(&[[0.0, 0.0], [f64::NAN, 0.0]]), "t").is_err());
+        let mut zone = wall(&[[0.0, 0.0], [10.0, 0.0], [10.0, 10.0]]);
+        zone.kind = ObstacleKind::Slow;
+        zone.factor = 0.0;
+        assert!(e.set_obstacle(zone.clone(), "t").is_err());
+        zone.factor = 0.5;
+        let z = e.set_obstacle(zone, "t").unwrap();
+        assert_eq!(z.id, 1);
+        assert_eq!(e.delete_obstacle(99, "t"), Err(EngineError::NotFound));
+        e.delete_obstacle(1, "t").unwrap();
+        assert!(e.obstacles().is_empty());
+        let ch = e.drain_changes();
+        assert!(ch.iter().any(|c| matches!(c, Change::Obstacles(v) if v.is_empty())));
+    }
+
+    #[test]
+    fn speed_is_worked_out_from_movement_and_old_reports_are_ignored() {
+        let mut e = eng();
+        let p0 = (39.0000, -104.0000);
+        let p300 = (39.0000 + 300.0 / 110_574.0, -104.0000); // 300 m north
+        e.report_position(pos_at("a", p0, None, 60));
+        assert_eq!(e.units[0].speed_mph, 0.0);
+        e.report_position(pos_at("a", p300, None, 0));
+        let mph = e.units[0].speed_mph;
+        assert!((mph - 300.0 / 60.0 / MPS_PER_MPH).abs() < 0.3, "{mph}");
+        assert!(e.units[0].moving);
+
+        // A report older than the one held (a replay after reconnect) changes nothing.
+        e.report_position(pos_at("a", p0, None, 300));
+        assert!((e.units[0].lat - p300.0).abs() < 1e-9);
+
+        // GPS wander while parked is not movement.
+        let mut e = eng();
+        e.report_position(pos_at("a", p0, None, 900));
+        e.report_position(pos_at("a", (p0.0 + 3.0 / 110_574.0, p0.1), None, 0));
+        assert_eq!(e.units[0].speed_mph, 0.0);
+        assert!(!e.units[0].moving);
+    }
+
+    #[test]
+    fn recovered_report_carries_its_age_into_contact_state() {
+        let mut e = eng();
+        e.report_position(pos_at("a", (39.0, -104.0), None, 20 * 60));
+        let snap = e.snapshot();
+        let a = snap.units.iter().find(|u| u.unit.id == "a").unwrap();
+        assert_eq!(a.contact, Contact::Late, "parked and 20 minutes old");
+        assert!(a.age_sec > 1190.0);
+    }
+
+    #[test]
+    fn battery_is_kept_when_a_report_has_none() {
+        let mut e = eng();
+        e.report_battery("a", 80);
+        e.report_position(pos_at("a", (39.0, -104.0), Some(0.0), 0)); // battery -1
+        assert_eq!(e.units[0].battery, 80);
+    }
+
+    #[test]
+    fn contact_changes_are_logged_once_and_not_at_startup() {
+        let mut e = eng();
+        e.tick(); // nothing has reported: no noise at startup
+        assert!(e.log.is_empty());
+        e.report_position(pos_at("a", (39.0, -104.0), Some(0.0), 0));
+        e.tick();
+        assert!(e.log.is_empty(), "first contact after start is not news");
+
+        e.units[0].seen_mono = Some(Instant::now() - m(16.0));
+        e.tick();
+        e.tick();
+        assert_eq!(e.log.len(), 1, "logged once: {:?}", e.log);
+        assert!(e.log[0].text.contains("Unit a is late"));
+        assert_eq!(e.log[0].seat, "system");
+
+        let inc = e.open_incident(39.0, -104.0, "", "t");
+        e.dispatch(inc.id, &["a".to_string()], "t").unwrap();
+        e.units[0].seen_mono = Some(Instant::now() - m(31.0));
+        let alerts = e.alerts();
+        assert_eq!(alerts.len(), 1);
+        assert_eq!(alerts[0].severity, "crit", "a dispatched unit going dark is critical");
+        e.tick();
+        let last = e.log.last().unwrap();
+        assert!(last.text.contains("no contact while dispatched"), "{}", last.text);
+        assert_eq!(last.incident, Some(inc.id));
+
+        e.report_position(pos_at("a", (39.0, -104.0), Some(0.0), 0));
+        e.tick();
+        assert!(e.log.last().unwrap().text.contains("back in contact"));
+        assert!(e.alerts().is_empty());
+    }
+
+    #[test]
+    fn off_duty_units_raise_no_alerts() {
+        let mut e = eng();
+        e.report_position(pos_at("a", (39.0, -104.0), Some(0.0), 0));
+        e.set_status("a", Status::OffDuty, "t").unwrap();
+        e.units[0].seen_mono = Some(Instant::now() - m(60.0));
+        assert!(e.alerts().is_empty());
+    }
+
+    #[test]
+    fn repeater_silence_is_flagged_only_for_placed_repeaters() {
+        let mut e = eng();
+        e.set_repeater("r1", "R1", 39.0, -104.0, true).unwrap();
+        e.set_repeater("r2", "R2", 0.0, 0.0, false).unwrap();
+        e.set_has_credentials("r1", true).unwrap();
+        e.set_has_credentials("r2", true).unwrap();
+        e.report_repeater("r1");
+        e.report_repeater("r2");
+        e.repeaters[0].seen_mono = Some(Instant::now() - m(45.0));
+        e.repeaters[1].seen_mono = Some(Instant::now() - m(45.0));
+        let alerts = e.alerts();
+        assert_eq!(alerts.len(), 1);
+        assert_eq!(alerts[0].kind, "repeater");
+    }
+
+    const K1: &str = "11111111111111111111111111111111111111111111111111111111111111ab";
+    const K2: &str = "22222222222222222222222222222222222222222222222222222222222222cd";
+
+    #[test]
+    fn adopting_radio_nodes() {
+        let mut e = eng();
+        let id = e.adopt_unit(&K1.to_uppercase(), "UTV 7", "utv").unwrap();
+        assert_eq!(id, "utv-7");
+        assert_eq!(e.unit_for_key(K1), Some(id.clone()));
+        assert_eq!(e.units.iter().find(|u| u.id == id).unwrap().group_id, "utv");
+        // The same node cannot be adopted twice, as a unit or a repeater.
+        assert!(matches!(
+            e.adopt_unit(K1, "Again", "utv"),
+            Err(EngineError::Conflict(_))
+        ));
+        assert!(matches!(e.adopt_repeater(K1, "Again"), Err(EngineError::Conflict(_))));
+        let r = e.adopt_repeater(K2, "Rpt North").unwrap();
+        assert_eq!(r, "rpt-north");
+        assert_eq!(e.repeater_for_key(K2), Some(r.clone()));
+        assert!(
+            !e.repeaters[0].placed,
+            "an adopted repeater waits to be placed on the map"
+        );
+        // Name collisions get a suffix.
+        let k3 = "33".repeat(32);
+        assert_eq!(e.adopt_unit(&k3, "UTV 7", "utv").unwrap(), "utv-7-2");
+        assert!(e.adopt_unit("xyz", "Bad", "utv").is_err());
+        assert!(e.set_unit_key("a", "").is_ok(), "clearing a key is allowed");
+    }
+
+    #[test]
+    fn switching_sites_swaps_overlay_obstacles_and_placements_but_keeps_the_crew() {
+        let mut e = eng();
+        e.set_repeater("r1", "R1", 39.0, -104.0, true).unwrap();
+        e.set_repeater("r2", "R2", 39.1, -104.1, true).unwrap();
+        e.set_has_credentials("r1", true).unwrap();
+        e.set_obstacle(wall(&[[0.0, 0.0], [100.0, 100.0]]), "t").unwrap();
+        e.report_position(pos_at("a", (39.0, -104.0), Some(0.0), 0));
+        let before = e.export_site();
+
+        let mut other = before.clone();
+        other.site.name = "Airshow B".into();
+        other.obstacles = vec![];
+        other.repeaters = vec![Placement {
+            id: "r2".into(),
+            name: "R2".into(),
+            node_key: String::new(),
+            lat: 40.0,
+            lon: -105.0,
+            placed: true,
+        }];
+        let inc = e.open_incident(39.0, -104.0, "", "t");
+        assert!(matches!(
+            e.activate_site(other.clone(), "t"),
+            Err(EngineError::Conflict(_))
+        ));
+        e.close_incident(inc.id, "t").unwrap();
+        e.activate_site(other, "t").unwrap();
+        assert_eq!(e.site.name, "Airshow B");
+        assert!(e.obstacles.is_empty());
+        let r1 = e.repeaters.iter().find(|r| r.id == "r1").unwrap();
+        let r2 = e.repeaters.iter().find(|r| r.id == "r2").unwrap();
+        assert!(
+            !r1.placed && r1.has_credentials,
+            "unlisted repeater is unplaced, keeps its password"
+        );
+        assert!(r2.placed && (r2.lat - 40.0).abs() < 1e-9);
+        assert!(e.units[0].has_pos, "units belong to the crew, not the site");
+        assert!(e.log.last().unwrap().text.contains("Switched to site Airshow B"));
+
+        // Switching back restores the first site's obstacles, renumbered from 1.
+        e.activate_site(before, "t").unwrap();
+        assert_eq!(e.obstacles.len(), 1);
+        assert_eq!(e.obstacles[0].id, 1);
+        let ch = e.drain_changes();
+        assert!(ch
+            .iter()
+            .any(|c| matches!(c, Change::Site(s) if s.name == "Unnamed site")));
     }
 }

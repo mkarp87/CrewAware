@@ -6,9 +6,11 @@ license.workspace = true
 
 [dependencies]
 anyhow.workspace = true
+base64 = "0.22"
 axum.workspace = true
 chrono.workspace = true
 crewaware-core = { path = "../../crates/crewaware-core" }
+crewaware-gateway = { path = "../../crates/crewaware-gateway" }
 crewaware-store = { path = "../../crates/crewaware-store" }
 futures-util.workspace = true
 rand.workspace = true

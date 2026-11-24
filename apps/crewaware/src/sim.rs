@@ -95,8 +95,9 @@ pub async fn run(app: Arc<App>, parked_every: Duration) {
                         unit_id: u.id.into(),
                         lat: u.cx,
                         lon: u.cy,
-                        speed_mph: 0.0,
+                        speed_mph: Some(0.0),
                         battery,
+                        age_secs: 0,
                     };
                     app.with(|e| e.report_position(p));
                 }
@@ -112,8 +113,9 @@ pub async fn run(app: Arc<App>, parked_every: Duration) {
                 unit_id: u.id.into(),
                 lat,
                 lon,
-                speed_mph: mph,
+                speed_mph: Some(mph),
                 battery,
+                age_secs: 0,
             };
             app.with(|e| e.report_position(p));
         }

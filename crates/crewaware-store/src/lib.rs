@@ -188,6 +188,7 @@ impl Store {
                 battery: r.get("battery"),
                 last_seen: r.get("last_seen"),
                 incident_id: r.get("incident_id"),
+                node_key: r.get("node_key"),
                 seen_mono: None,
             });
         }
@@ -217,6 +218,7 @@ impl Store {
                 lat: r.get("lat"),
                 lon: r.get("lon"),
                 placed: r.get("placed"),
+                node_key: r.get("node_key"),
                 last_seen: r.get("last_seen"),
                 has_credentials: r.get("has_credentials"),
                 reading,
@@ -242,7 +244,7 @@ impl Store {
             });
         }
         let mut log: Vec<LogEntry> =
-            sqlx::query("SELECT t, seat, text FROM activity_log ORDER BY t DESC, id DESC LIMIT 2000")
+            sqlx::query("SELECT t, seat, text, incident_id FROM activity_log ORDER BY t DESC, id DESC LIMIT 2000")
                 .fetch_all(&self.pool)
                 .await?
                 .into_iter()
@@ -250,10 +252,31 @@ impl Store {
                     t: r.get("t"),
                     seat: r.get("seat"),
                     text: r.get("text"),
+                    incident: r.get("incident_id"),
                 })
                 .collect();
         log.reverse();
         st.log = log;
+        for r in sqlx::query("SELECT * FROM obstacles ORDER BY id")
+            .fetch_all(&self.pool)
+            .await?
+        {
+            let kind: String = r.get("kind");
+            let points: serde_json::Value = r.get("points");
+            st.obstacles.push(Obstacle {
+                id: r.get("id"),
+                kind: match kind.as_str() {
+                    "wall" => ObstacleKind::Wall,
+                    "gate" => ObstacleKind::Gate,
+                    "no_go" => ObstacleKind::NoGo,
+                    _ => ObstacleKind::Slow,
+                },
+                name: r.get("name"),
+                points: serde_json::from_value(points).unwrap_or_default(),
+                open: r.get("open"),
+                factor: r.get("factor"),
+            });
+        }
         Ok(st)
     }
 
@@ -261,10 +284,10 @@ impl Store {
         match c {
             Change::Unit(u) => {
                 sqlx::query(
-                    "INSERT INTO units (id,name,group_id,status,has_pos,lat,lon,speed_mph,moving,battery,last_seen,incident_id)
-                     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+                    "INSERT INTO units (id,name,group_id,status,has_pos,lat,lon,speed_mph,moving,battery,last_seen,incident_id,node_key)
+                     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
                      ON CONFLICT (id) DO UPDATE SET name=$2,group_id=$3,status=$4,has_pos=$5,lat=$6,lon=$7,
-                       speed_mph=$8,moving=$9,battery=$10,last_seen=$11,incident_id=$12",
+                       speed_mph=$8,moving=$9,battery=$10,last_seen=$11,incident_id=$12,node_key=$13",
                 )
                 .bind(&u.id)
                 .bind(&u.name)
@@ -278,13 +301,14 @@ impl Store {
                 .bind(u.battery)
                 .bind(u.last_seen)
                 .bind(u.incident_id)
+                .bind(&u.node_key)
                 .execute(&self.pool)
                 .await?;
             }
             Change::Repeater(r) => {
                 sqlx::query(
-                    "INSERT INTO repeaters (id,name,lat,lon,placed,last_seen) VALUES ($1,$2,$3,$4,$5,$6)
-                     ON CONFLICT (id) DO UPDATE SET name=$2,lat=$3,lon=$4,placed=$5,last_seen=$6",
+                    "INSERT INTO repeaters (id,name,lat,lon,placed,last_seen,node_key) VALUES ($1,$2,$3,$4,$5,$6,$7)
+                     ON CONFLICT (id) DO UPDATE SET name=$2,lat=$3,lon=$4,placed=$5,last_seen=$6,node_key=$7",
                 )
                 .bind(&r.id)
                 .bind(&r.name)
@@ -292,6 +316,7 @@ impl Store {
                 .bind(r.lon)
                 .bind(r.placed)
                 .bind(r.last_seen)
+                .bind(&r.node_key)
                 .execute(&self.pool)
                 .await?;
             }
@@ -327,10 +352,11 @@ impl Store {
                 .await?;
             }
             Change::Log(l) => {
-                sqlx::query("INSERT INTO activity_log (t,seat,text) VALUES ($1,$2,$3)")
+                sqlx::query("INSERT INTO activity_log (t,seat,text,incident_id) VALUES ($1,$2,$3,$4)")
                     .bind(l.t)
                     .bind(&l.seat)
                     .bind(&l.text)
+                    .bind(l.incident)
                     .execute(&self.pool)
                     .await?;
             }
@@ -370,6 +396,44 @@ impl Store {
                 .execute(&self.pool)
                 .await?;
             }
+            Change::Obstacles(list) => {
+                let mut tx = self.pool.begin().await?;
+                sqlx::query("DELETE FROM obstacles").execute(&mut *tx).await?;
+                for o in list {
+                    let kind = match o.kind {
+                        ObstacleKind::Wall => "wall",
+                        ObstacleKind::Gate => "gate",
+                        ObstacleKind::NoGo => "no_go",
+                        ObstacleKind::Slow => "slow",
+                    };
+                    sqlx::query("INSERT INTO obstacles (id,kind,name,points,open,factor) VALUES ($1,$2,$3,$4,$5,$6)")
+                        .bind(o.id)
+                        .bind(kind)
+                        .bind(&o.name)
+                        .bind(serde_json::to_value(&o.points)?)
+                        .bind(o.open)
+                        .bind(o.factor)
+                        .execute(&mut *tx)
+                        .await?;
+                }
+                tx.commit().await?;
+            }
+            Change::RemoveUnit(id) => {
+                sqlx::query("DELETE FROM position_history WHERE unit_id = $1")
+                    .bind(id)
+                    .execute(&self.pool)
+                    .await?;
+                sqlx::query("DELETE FROM units WHERE id = $1")
+                    .bind(id)
+                    .execute(&self.pool)
+                    .await?;
+            }
+            Change::RemoveRepeater(id) => {
+                sqlx::query("DELETE FROM repeaters WHERE id = $1")
+                    .bind(id)
+                    .execute(&self.pool)
+                    .await?;
+            }
             Change::Settings(s) => {
                 sqlx::query("INSERT INTO settings (id,data) VALUES (1,$1) ON CONFLICT (id) DO UPDATE SET data=$1")
                     .bind(serde_json::to_value(s)?)
@@ -407,6 +471,87 @@ impl Store {
             }
         }
         Ok(())
+    }
+
+    // ---- saved sites ----
+
+    pub async fn list_profiles(&self) -> Result<Vec<(i32, String, DateTime<Utc>)>> {
+        Ok(
+            sqlx::query("SELECT id, name, saved_at FROM site_profiles ORDER BY lower(name)")
+                .fetch_all(&self.pool)
+                .await?
+                .into_iter()
+                .map(|r| (r.get("id"), r.get("name"), r.get("saved_at")))
+                .collect(),
+        )
+    }
+
+    /// Saves under the site's name, replacing an earlier save of the same name.
+    pub async fn save_profile(&self, data: &SiteData) -> Result<i32> {
+        let r = sqlx::query(
+            "INSERT INTO site_profiles (name,data) VALUES ($1,$2)
+             ON CONFLICT (name) DO UPDATE SET data=$2, saved_at=now() RETURNING id",
+        )
+        .bind(&data.site.name)
+        .bind(serde_json::to_value(data)?)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(r.get("id"))
+    }
+
+    pub async fn get_profile(&self, id: i32) -> Result<Option<SiteData>> {
+        match sqlx::query("SELECT data FROM site_profiles WHERE id = $1")
+            .bind(id)
+            .fetch_optional(&self.pool)
+            .await?
+        {
+            Some(r) => Ok(Some(serde_json::from_value(r.get("data"))?)),
+            None => Ok(None),
+        }
+    }
+
+    /// Image files that saved sites point at, so cleaning up unused uploads leaves them alone.
+    pub async fn profile_assets(&self) -> Result<Vec<String>> {
+        let mut out = Vec::new();
+        for r in
+            sqlx::query("SELECT data->'site'->>'overlay' AS overlay, data->'site'->>'logo' AS logo FROM site_profiles")
+                .fetch_all(&self.pool)
+                .await?
+        {
+            for col in ["overlay", "logo"] {
+                if let Some(n) = r.get::<Option<String>, _>(col).filter(|n| !n.is_empty()) {
+                    out.push(n);
+                }
+            }
+        }
+        Ok(out)
+    }
+
+    pub async fn delete_profile(&self, id: i32) -> Result<bool> {
+        Ok(sqlx::query("DELETE FROM site_profiles WHERE id = $1")
+            .bind(id)
+            .execute(&self.pool)
+            .await?
+            .rows_affected()
+            > 0)
+    }
+
+    /// Every log line tied to one incident, oldest first, for its report.
+    pub async fn incident_log(&self, incident_id: i32) -> Result<Vec<LogEntry>> {
+        Ok(
+            sqlx::query("SELECT t, seat, text FROM activity_log WHERE incident_id = $1 ORDER BY t, id")
+                .bind(incident_id)
+                .fetch_all(&self.pool)
+                .await?
+                .into_iter()
+                .map(|r| LogEntry {
+                    t: r.get("t"),
+                    seat: r.get("seat"),
+                    text: r.get("text"),
+                    incident: Some(incident_id),
+                })
+                .collect(),
+        )
     }
 
     /// Deletes position history older than `days`. Returns the rows removed.

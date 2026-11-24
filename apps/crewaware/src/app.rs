@@ -1,6 +1,8 @@
 use crewaware_core::{Change, Engine, Snapshot};
+use crewaware_gateway::client::{Gateway, RadioStatus};
 use crewaware_store::Store;
-use std::collections::HashMap;
+use serde::Serialize;
+use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Instant;
 use tokio::sync::{broadcast, mpsc, oneshot};
@@ -22,6 +24,63 @@ pub struct App {
     /// Set once a repeater reader (the radio gateway or the simulator) is running.
     refresh_tx: OnceLock<mpsc::UnboundedSender<String>>,
     last_refresh: Mutex<HashMap<String, Instant>>,
+    radio: Mutex<Radio>,
+    gateway: OnceLock<Gateway>,
+}
+
+/// A node the radio has heard that is not yet a unit or repeater.
+#[derive(Clone)]
+pub struct Discovered {
+    pub key: String,
+    pub name: String,
+    /// "unit", "repeater" or "room".
+    pub kind: &'static str,
+    pub lat: f64,
+    pub lon: f64,
+    pub has_pos: bool,
+    pub heard: Instant,
+}
+
+#[derive(Default)]
+struct Radio {
+    /// "none", "sim" or "radio".
+    mode: &'static str,
+    status: Option<RadioStatus>,
+    discovered: HashMap<String, Discovered>,
+}
+
+#[derive(Serialize)]
+pub struct DiscoveredView {
+    key: String,
+    name: String,
+    kind: &'static str,
+    lat: f64,
+    lon: f64,
+    has_pos: bool,
+    age_sec: f64,
+}
+
+#[derive(Serialize)]
+pub struct RadioView {
+    mode: &'static str,
+    connected: bool,
+    name: String,
+    key: String,
+    model: String,
+    version: String,
+    contacts: usize,
+    /// Seconds since the last contact sync, if any.
+    sync_age_sec: Option<f64>,
+    error: String,
+    discovered: Vec<DiscoveredView>,
+}
+
+/// What /api/state and the live stream carry: the engine snapshot plus the radio's state.
+#[derive(Serialize)]
+pub struct StateView {
+    #[serde(flatten)]
+    pub snap: Snapshot,
+    pub radio: RadioView,
 }
 
 /// Why a manual repeater read was not queued.
@@ -63,6 +122,8 @@ impl App {
             cookie_secure,
             refresh_tx: OnceLock::new(),
             last_refresh: Mutex::new(HashMap::new()),
+            radio: Mutex::new(Radio::default()),
+            gateway: OnceLock::new(),
         })
     }
 
@@ -88,6 +149,95 @@ impl App {
 
     pub fn snapshot(&self) -> Snapshot {
         self.read(|e| e.snapshot())
+    }
+
+    pub fn set_mode(&self, mode: &'static str) {
+        self.radio.lock().unwrap().mode = mode;
+    }
+
+    pub fn set_gateway(&self, g: Gateway) {
+        let _ = self.gateway.set(g);
+    }
+
+    pub fn gateway(&self) -> Option<&Gateway> {
+        self.gateway.get()
+    }
+
+    pub fn set_radio_status(&self, s: RadioStatus) {
+        self.radio.lock().unwrap().status = Some(s);
+        self.touch();
+    }
+
+    /// Remembers a node the radio heard that nobody has claimed yet, so an admin can adopt it.
+    pub fn note_discovered(&self, d: Discovered) {
+        let mut r = self.radio.lock().unwrap();
+        let new = !r.discovered.contains_key(&d.key);
+        r.discovered.insert(d.key.clone(), d);
+        if r.discovered.len() > 500 {
+            // A busy mesh: keep the most recently heard.
+            let mut v: Vec<_> = r.discovered.values().map(|x| (x.heard, x.key.clone())).collect();
+            v.sort();
+            for (_, k) in v.into_iter().take(100) {
+                r.discovered.remove(&k);
+            }
+        }
+        drop(r);
+        if new {
+            self.touch();
+        }
+    }
+
+    /// What the radio last told us about a node nobody has claimed yet.
+    pub fn discovered(&self, key: &str) -> Option<Discovered> {
+        self.radio.lock().unwrap().discovered.get(key).cloned()
+    }
+
+    /// The snapshot plus the radio's state; discovered nodes that have since been adopted are left out.
+    pub fn view(&self) -> StateView {
+        let snap = self.snapshot();
+        let claimed: HashSet<&str> = snap
+            .units
+            .iter()
+            .map(|u| u.unit.node_key.as_str())
+            .chain(snap.repeaters.iter().map(|r| r.repeater.node_key.as_str()))
+            .filter(|k| !k.is_empty())
+            .collect();
+        let r = self.radio.lock().unwrap();
+        let mut discovered: Vec<DiscoveredView> = r
+            .discovered
+            .values()
+            .filter(|d| !claimed.contains(d.key.as_str()))
+            .map(|d| DiscoveredView {
+                key: d.key.clone(),
+                name: d.name.clone(),
+                kind: d.kind,
+                lat: d.lat,
+                lon: d.lon,
+                has_pos: d.has_pos,
+                age_sec: d.heard.elapsed().as_secs_f64(),
+            })
+            .collect();
+        discovered.sort_by(|a, b| {
+            a.name
+                .to_lowercase()
+                .cmp(&b.name.to_lowercase())
+                .then(a.key.cmp(&b.key))
+        });
+        let st = r.status.clone().unwrap_or_default();
+        let now = crewaware_gateway::client::now_epoch();
+        let radio = RadioView {
+            mode: r.mode,
+            connected: st.connected,
+            name: st.name,
+            key: st.key,
+            model: st.model,
+            version: st.version,
+            contacts: st.contacts,
+            sync_age_sec: st.last_sync.map(|t| now.saturating_sub(t) as f64),
+            error: st.error,
+            discovered,
+        };
+        StateView { snap, radio }
     }
 
     /// Wakes live viewers without changing the engine, for changes made outside it.

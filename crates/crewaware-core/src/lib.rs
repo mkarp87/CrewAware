@@ -4,6 +4,8 @@
 pub mod engine;
 pub mod geo;
 pub mod model;
+pub mod route;
 
 pub use engine::{Candidate, Change, Engine, EngineError, Snapshot};
 pub use model::*;
+pub use route::{Route, RouteField};

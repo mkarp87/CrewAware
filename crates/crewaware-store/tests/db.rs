@@ -44,8 +44,9 @@ async fn store_round_trip_and_auth() {
         unit_id: "u1".into(),
         lat: 39.0,
         lon: -104.0,
-        speed_mph: 7.0,
+        speed_mph: Some(7.0),
         battery: 81,
+        age_secs: 0,
     });
     e.report_repeater("r1");
     let inc = e.open_incident(39.0005, -104.0005, "Medical", "seat A");
@@ -98,14 +99,87 @@ async fn store_round_trip_and_auth() {
     flush(&store, &mut e).await;
     assert_eq!(store.load().await.unwrap().settings, s);
 
+    // ---- radio keys, obstacles, incident log, removal ----
+    let key = "ab".repeat(32);
+    let adopted = e.adopt_unit(&key, "UTV 9", "utv").unwrap();
+    let rkey = "cd".repeat(32);
+    let rid = e.adopt_repeater(&rkey, "Rpt North").unwrap();
+    e.set_obstacle(
+        Obstacle {
+            id: 0,
+            kind: ObstacleKind::Gate,
+            name: "Gate A".into(),
+            points: vec![[10.0, 10.0], [10.0, 90.0]],
+            open: false,
+            factor: 1.0,
+        },
+        "seat A",
+    )
+    .unwrap();
+    e.set_obstacle(
+        Obstacle {
+            id: 0,
+            kind: ObstacleKind::Slow,
+            name: "Mud".into(),
+            points: vec![[0.0, 0.0], [50.0, 0.0], [50.0, 50.0]],
+            open: false,
+            factor: 0.4,
+        },
+        "seat A",
+    )
+    .unwrap();
+    e.set_gate(1, true, "seat B").unwrap();
+    flush(&store, &mut e).await;
+    let loaded = store.load().await.unwrap();
+    assert_eq!(loaded.units.iter().find(|u| u.id == adopted).unwrap().node_key, key);
+    assert_eq!(loaded.repeaters.iter().find(|r| r.id == rid).unwrap().node_key, rkey);
+    assert_eq!(loaded.obstacles.len(), 2);
+    assert!(loaded.obstacles[0].open && loaded.obstacles[0].kind == ObstacleKind::Gate);
+    assert_eq!(loaded.obstacles[1].factor, 0.4);
+    assert_eq!(loaded.obstacles[1].points.len(), 3);
+    // Two nodes cannot share a key, even if the engine were bypassed.
+    let mut dup = loaded.units.iter().find(|u| u.id == adopted).unwrap().clone();
+    dup.id = "dup".into();
+    assert!(store.apply(&Change::Unit(dup)).await.is_err());
+
+    // The incident report reads its log lines back, oldest first.
+    let rep = store.incident_log(inc.id).await.unwrap();
+    assert!(rep.len() >= 3, "{rep:?}");
+    assert!(rep.first().unwrap().text.starts_with("Opened"));
+    assert!(rep.last().unwrap().text.starts_with("Closed"));
+    assert!(store.incident_log(9999).await.unwrap().is_empty());
+
+    // Removing a unit or repeater removes it and its rows.
+    e.remove_unit(&adopted, "seat A").unwrap();
+    e.remove_repeater(&rid, "seat A").unwrap();
+    flush(&store, &mut e).await;
+    let loaded = store.load().await.unwrap();
+    assert!(loaded.units.iter().all(|u| u.id != adopted));
+    assert!(loaded.repeaters.iter().all(|r| r.id != rid));
+
+    // ---- saved sites ----
+    let mut data = e.export_site();
+    data.site.name = "Airshow 2027".into();
+    let id = store.save_profile(&data).await.unwrap();
+    assert_eq!(store.save_profile(&data).await.unwrap(), id, "same name replaces");
+    let listed = store.list_profiles().await.unwrap();
+    assert_eq!(listed.len(), 1);
+    assert_eq!(listed[0].1, "Airshow 2027");
+    let back = store.get_profile(id).await.unwrap().unwrap();
+    assert_eq!(back, data);
+    assert!(store.get_profile(id + 100).await.unwrap().is_none());
+    assert!(store.delete_profile(id).await.unwrap());
+    assert!(!store.delete_profile(id).await.unwrap());
+
     // ---- position history is throttled per unit ----
     for _ in 0..5 {
         e.report_position(Position {
             unit_id: "u2".into(),
             lat: 39.0,
             lon: -104.0,
-            speed_mph: 5.0,
+            speed_mph: Some(5.0),
             battery: 70,
+            age_secs: 0,
         });
     }
     flush(&store, &mut e).await;
